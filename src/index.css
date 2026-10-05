@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+    --color-cream-light: #FBF8EE;
+    --color-cream-dark: #F8F5E9;
+    --color-cream-border: #E5E0D0;
+
+    --color-lime-brand: #8BEB00;
+    --color-lime-hover: #7CD300;
+
+    --color-dark: #0B1320;
+
+    --color-violet-brand: #8B5CF6;
+    --color-coral-brand: #EF4444;
+}
