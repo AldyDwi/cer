@@ -7,6 +7,10 @@ import GuestRoute from "./GuestRoute";
 import StudentHome from "../features/students/pages/StudentHome";
 import MaterialsPage from "../features/materials/pages/MaterialsPage";
 import StudentsPage from "../features/students/pages/StudentsPage";
+import CreateCerPage from "../features/cer/pages/CreateCerPage";
+import ManageCerPage from "../features/cer/pages/ManageCerPage";
+import ProfilePage from "../features/profile/pages/ProfilePage";
+import GradeRecapPage from "../features/cer/pages/GradeRecapPage";
 
 import { ROLES } from "../constants/roles";
 
@@ -45,17 +49,7 @@ function AppRoutes() {
       >
         <Route
           path="/teacher/cer/create"
-          element={
-            <div>
-              <h1 className="text-2xl font-bold text-dark">
-                Buat CER
-              </h1>
-
-              <p className="mt-2 text-gray-500">
-                Buat aktivitas CER baru.
-              </p>
-            </div>
-          }
+          element={<CreateCerPage />}
         />
 
         <Route
@@ -70,28 +64,17 @@ function AppRoutes() {
 
         <Route
           path="/teacher/profile"
-          element={
-            <div>
-              <h1 className="text-2xl font-bold text-dark">
-                Profil
-              </h1>
-
-              <p className="mt-2 text-gray-500">
-                Kelola informasi profil guru.
-              </p>
-            </div>
-          }
+          element={<ProfilePage />}
         />
 
         <Route
           path="/teacher/cer/:id"
-          element={
-            <div>
-              <h1 className="text-2xl font-bold text-dark">
-                Kelola CER
-              </h1>
-            </div>
-          }
+          element={<ManageCerPage />}
+        />
+
+        <Route
+          path="/teacher/cer/:id/grades"
+          element={<GradeRecapPage />}
         />
       </Route>
 

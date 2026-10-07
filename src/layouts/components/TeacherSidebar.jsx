@@ -10,9 +10,15 @@ import {
   LogOut,
   ChevronRight,
   X,
+  MoreHorizontal,
 } from "lucide-react";
 
 import { useAuth } from "../../contexts/AuthContext";
+import { useCerActivities } from "../../contexts/CerActivityContext";
+
+import CerActivityMenu from "../../features/cer/components/CerActivityMenu";
+import EditCerModal from "../../features/cer/components/EditCerModal";
+import DeleteCerModal from "../../features/cer/components/DeleteCerModal";
 
 function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
   const { user, logout } = useAuth();
@@ -26,6 +32,12 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
 
   const userMenuRef = useRef(null);
   const previousOpenRef = useRef(isOpen);
+
+  const {
+    activities,
+    loading: activitiesLoading,
+    refreshActivities,
+  } = useCerActivities();
 
   /*
    * Delay 0.5 detik hanya ketika:
@@ -146,7 +158,7 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
           <>
             {/* Logo + Website Name */}
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dark text-lg font-bold text-lime-brand">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-brand text-lg font-bold text-dark">
                 R
               </div>
 
@@ -175,7 +187,7 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
           </>
         ) : (
           /* =====================================
-             COMPACT LOGO
+            COMPACT LOGO
           ====================================== */
           <button
             type="button"
@@ -205,69 +217,83 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
       {/* =========================================
           NAVIGATION
       ========================================== */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-        {/* Menu Label */}
-        {isOpen && (
-          <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            Menu
-          </p>
-        )}
+      <nav className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-4">
+        {/* =====================================
+            MENU UTAMA
+        ====================================== */}
+        <div className="shrink-0">
+          {/* Menu Label */}
+          {isOpen && (
+            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Menu
+            </p>
+          )}
 
-        <div className="space-y-2">
-          <SidebarItem
-            to="/teacher/cer/create"
-            icon={<FilePlus2 size={20} />}
-            collapsed={!isOpen}
-            label="Buat CER"
-            onNavigate={isMobile ? onClose : undefined}
-          >
-            Buat CER
-          </SidebarItem>
+          <div className="space-y-2">
+            <SidebarItem
+              to="/teacher/cer/create"
+              icon={<FilePlus2 size={20} />}
+              collapsed={!isOpen}
+              label="Buat CER"
+              onNavigate={isMobile ? onClose : undefined}
+            >
+              Buat CER
+            </SidebarItem>
 
-          <SidebarItem
-            to="/teacher/materials"
-            icon={<BookOpen size={20} />}
-            collapsed={!isOpen}
-            label="Materi"
-            onNavigate={isMobile ? onClose : undefined}
-          >
-            Materi
-          </SidebarItem>
+            <SidebarItem
+              to="/teacher/materials"
+              icon={<BookOpen size={20} />}
+              collapsed={!isOpen}
+              label="Materi"
+              onNavigate={isMobile ? onClose : undefined}
+            >
+              Materi
+            </SidebarItem>
 
-          <SidebarItem
-            to="/teacher/students"
-            icon={<Users size={20} />}
-            collapsed={!isOpen}
-            label="Kelola Student"
-            onNavigate={isMobile ? onClose : undefined}
-          >
-            Mahasiswa
-          </SidebarItem>
+            <SidebarItem
+              to="/teacher/students"
+              icon={<Users size={20} />}
+              collapsed={!isOpen}
+              label="Kelola Student"
+              onNavigate={isMobile ? onClose : undefined}
+            >
+              Mahasiswa
+            </SidebarItem>
+          </div>
         </div>
 
         {/* =====================================
             AKTIVITAS CER
         ====================================== */}
         {isOpen && (
-          <div className="mt-8">
-            <p className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+          <div className="mt-8 flex min-h-0 flex-1 flex-col">
+            {/* Label tetap di atas */}
+            <p className="mb-3 shrink-0 px-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
               Aktivitas CER
             </p>
 
-            <div className="space-y-1">
-              <SidebarActivity
-                to="/teacher/cer/1"
-                onNavigate={isMobile ? onClose : undefined}
-              >
-                Dampak Deforestasi
-              </SidebarActivity>
-
-              <SidebarActivity
-                to="/teacher/cer/2"
-                onNavigate={isMobile ? onClose : undefined}
-              >
-                Ekosistem Hutan
-              </SidebarActivity>
+            {/* Hanya daftar aktivitas yang scroll */}
+            <div className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+              <div className="space-y-1">
+                {activitiesLoading ? (
+                  <div className="space-y-2 px-3">
+                    <div className="h-4 w-36 animate-pulse rounded bg-gray-100" />
+                    <div className="h-4 w-28 animate-pulse rounded bg-gray-100" />
+                  </div>
+                ) : activities.length === 0 ? (
+                  <p className="px-3 text-sm text-gray-400">
+                    Belum ada aktivitas CER.
+                  </p>
+                ) : (
+                  activities.map((activity) => (
+                    <SidebarActivity
+                      key={activity.id}
+                      activity={activity}
+                      onUpdated={refreshActivities}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -293,7 +319,7 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
           >
             {/* User Info */}
             <div className="flex items-center gap-3 rounded-xl px-3 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dark font-semibold text-lime-brand">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-brand font-bold text-dark">
                 {user?.name?.charAt(0)?.toUpperCase() || "G"}
               </div>
 
@@ -344,7 +370,7 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
           }`}
         >
           {/* Avatar */}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-dark font-semibold text-lime-brand">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-brand font-bold text-dark">
             {user?.name?.charAt(0)?.toUpperCase() || "G"}
           </div>
 
@@ -432,21 +458,91 @@ function SidebarItem({
    SIDEBAR ACTIVITY
 ========================================= */
 
-function SidebarActivity({ to, children, onNavigate }) {
+function SidebarActivity({
+  activity,
+  onUpdated,
+}) {
+  const navigate = useNavigate();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [modal, setModal] = useState(null);
+
+  function handleOpenMenu(event) {
+    event.stopPropagation();
+
+    setMenuOpen((previous) => !previous);
+  }
+
+  function handleOpenEdit() {
+    setMenuOpen(false);
+    setModal("edit");
+  }
+
+  function handleOpenDelete() {
+    setMenuOpen(false);
+    setModal("delete");
+  }
+
+  function handleCloseModal() {
+    setModal(null);
+  }
+
   return (
-    <NavLink
-      to={to}
-      onClick={onNavigate}
-      className={({ isActive }) =>
-        `block truncate rounded-xl px-3 py-2.5 text-sm transition ${
-          isActive
-            ? "bg-cream-light font-medium text-dark"
-            : "text-gray-500 hover:bg-cream-light hover:text-dark"
-        }`
-      }
-    >
-      {children}
-    </NavLink>
+    <>
+      <div className="group relative flex items-center rounded-xl hover:bg-cream-light">
+        {/* Nama Aktivitas */}
+        <button
+          type="button"
+          onClick={() =>
+            navigate(`/teacher/cer/${activity.id}`)
+          }
+          className="min-w-0 flex-1 truncate px-3 py-2 text-left text-sm text-gray-600 transition hover:text-dark"
+        >
+          {activity.title}
+        </button>
+
+        {/* Tombol ... */}
+        <button
+          type="button"
+          onClick={handleOpenMenu}
+          aria-label="Menu aktivitas"
+          className={`mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-white hover:text-dark ${
+            menuOpen
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100"
+          }`}
+        >
+          <MoreHorizontal size={17} />
+        </button>
+
+        {/* Menu ... */}
+        {menuOpen && (
+          <CerActivityMenu
+            onClose={() => setMenuOpen(false)}
+            onEdit={handleOpenEdit}
+            onDelete={handleOpenDelete}
+          />
+        )}
+      </div>
+
+      {/* Modal Ubah */}
+      {modal === "edit" && (
+        <EditCerModal
+          activity={activity}
+          onClose={handleCloseModal}
+          onUpdated={onUpdated}
+        />
+      )}
+
+      {/* Modal Hapus */}
+      {modal === "delete" && (
+        <DeleteCerModal
+          activity={activity}
+          onClose={handleCloseModal}
+          onUpdated={onUpdated}
+        />
+      )}
+    </>
   );
 }
 

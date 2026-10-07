@@ -3,6 +3,7 @@ import {
     getCurrentUser,
     login as loginService,
     logout as logoutService,
+    updateProfile as updateProfileService,
 } from "../features/auth/services/authService";
 
 const AuthContext = createContext(null);
@@ -52,6 +53,18 @@ export function AuthProvider({ children }) {
         }
     }
 
+    /**
+     * Update current user profile.
+     */
+    async function updateProfile(data) {
+        const response =
+            await updateProfileService(data);
+
+        setUser(response.user);
+
+        return response;
+    }
+
     const value = {
         user,
         loading,
@@ -59,6 +72,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         checkAuth,
+        updateProfile,
     };
 
     return (

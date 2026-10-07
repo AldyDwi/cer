@@ -13,3 +13,25 @@
     --color-violet-brand: #8B5CF6;
     --color-coral-brand: #EF4444;
 }
+
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d3c8 transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #d6d3c8;
+  border-radius: 9999px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #b8b4a8;
+}

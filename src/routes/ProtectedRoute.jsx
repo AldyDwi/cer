@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import PageLoading from "../components/common/PageLoading";
 
 function ProtectedRoute({ children }) {
     const {
@@ -8,13 +9,7 @@ function ProtectedRoute({ children }) {
     } = useAuth();
 
     if (loading) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-cream-light">
-                <div className="text-sm font-medium text-dark">
-                    Memuat...
-                </div>
-            </div>
-        );
+        return <PageLoading />;
     }
 
     if (!isAuthenticated) {

@@ -463,8 +463,8 @@ function StudentAvatar({ name }) {
 
   const colors = [
     "bg-lime-brand text-dark",
-    "bg-sky-100 text-sky-600",
     "bg-violet-100 text-violet-600",
+    "bg-sky-100 text-sky-600",
     "bg-orange-100 text-orange-600",
     "bg-pink-100 text-pink-600",
   ];
@@ -501,7 +501,7 @@ function ClassBadge({ className }) {
   }
 
   const colors = [
-    "bg-lime-100 text-lime-700",
+    "bg-lime-brand text-dark",
     "bg-sky-100 text-sky-700",
     "bg-violet-100 text-violet-700",
     "bg-orange-100 text-orange-700",

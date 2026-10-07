@@ -31,3 +31,9 @@ export async function getCurrentUser() {
 
     return response.data;
 }
+
+export async function updateProfile(data) {
+  const response = await api.patch("/profile", data);
+
+  return response.data;
+}

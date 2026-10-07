@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { ROLES } from "../constants/roles";
+import PageLoading from "../components/common/PageLoading";
 
 function getHomePath(role) {
   if (role === ROLES.TEACHER) {
@@ -18,13 +19,7 @@ function RoleRoute({ children, allowedRoles }) {
   const { user, loading, isAuthenticated } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-cream-light">
-        <div className="text-sm font-medium text-dark">
-          Memuat...
-        </div>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   if (!isAuthenticated) {

@@ -31,3 +31,8 @@ export async function deleteMaterial(id) {
   const response = await api.delete(`/materials/${id}`);
   return response.data;
 }
+
+export async function getMaterialOptions() {
+  const response = await api.get("/materials/options");
+  return response.data;
+}
