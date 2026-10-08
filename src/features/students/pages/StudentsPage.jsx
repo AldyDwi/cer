@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plus,
   Pencil,
@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Users,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   getStudents,
@@ -21,11 +22,7 @@ import StudentFormModal from "../components/StudentFormModal";
 import DeleteStudentModal from "../components/DeleteStudentModal";
 
 function StudentsPage() {
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -35,52 +32,82 @@ function StudentsPage() {
   const [perPage, setPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    lastPage: 1,
-    total: 0,
-  });
-
   const [modal, setModal] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
-  async function loadStudents() {
-    try {
-      setLoading(true);
-      setError("");
+  /* =========================================================
+     REACT QUERY DATA FETCHING
+  ========================================================= */
 
-      const response = await getStudents({
+  const {
+    data: studentsData,
+    isLoading: loading,
+    isError,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["students", search, className, perPage, currentPage],
+    queryFn: () =>
+      getStudents({
         search,
         className,
         perPage,
         page: currentPage,
-      });
+      }),
+    staleTime: 1000 * 60 * 5, // Cache data selama 5 menit
+  });
 
-      setStudents(response.data);
-      setClasses(response.classes || []);
+  const students = studentsData?.data || [];
+  const classes = studentsData?.classes || [];
 
-      setPagination({
-        currentPage: response.current_page,
-        lastPage: response.last_page,
-        total: response.total,
-      });
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Gagal mengambil data student."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const pagination = {
+    currentPage: studentsData?.current_page || 1,
+    lastPage: studentsData?.last_page || 1,
+    total: studentsData?.total || 0,
+  };
 
-  useEffect(() => {
-    loadStudents();
-  }, [search, className, perPage, currentPage]);
+  const error =
+    isError &&
+    (queryError?.response?.data?.message ||
+      "Gagal mengambil data student.");
+
+  /* =========================================================
+     MUTATIONS (CREATE / UPDATE / DELETE)
+  ========================================================= */
+
+  const createMutation = useMutation({
+    mutationFn: createStudent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      setCurrentPage(1);
+      closeModal();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => updateStudent(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      closeModal();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteStudent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      if (students.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => page - 1);
+      }
+      closeModal();
+    },
+  });
+
+  /* =========================================================
+     HANDLERS
+  ========================================================= */
 
   function handleSearchSubmit(event) {
     event.preventDefault();
-
     setCurrentPage(1);
     setSearch(searchInput.trim());
   }
@@ -99,7 +126,6 @@ function StudentsPage() {
     if (page < 1 || page > pagination.lastPage) {
       return;
     }
-
     setCurrentPage(page);
   }
 
@@ -123,41 +149,19 @@ function StudentsPage() {
     setSelectedStudent(null);
   }
 
-  async function handleCreate(data) {
-    await createStudent(data);
-
-    setCurrentPage(1);
-    await loadStudents();
-
-    closeModal();
+  function handleCreate(data) {
+    return createMutation.mutateAsync(data);
   }
 
-  async function handleUpdate(data) {
-    await updateStudent(
-      selectedStudent.id,
-      data
-    );
-
-    await loadStudents();
-
-    closeModal();
+  function handleUpdate(data) {
+    return updateMutation.mutateAsync({
+      id: selectedStudent.id,
+      data,
+    });
   }
 
-  async function handleDelete() {
-    await deleteStudent(
-      selectedStudent.id
-    );
-
-    if (
-      students.length === 1 &&
-      currentPage > 1
-    ) {
-      setCurrentPage((page) => page - 1);
-    } else {
-      await loadStudents();
-    }
-
-    closeModal();
+  function handleDelete() {
+    return deleteMutation.mutateAsync(selectedStudent.id);
   }
 
   return (
@@ -193,9 +197,7 @@ function StudentsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Per Page */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">
-            Tampilkan
-          </span>
+          <span className="text-sm text-gray-500">Tampilkan</span>
 
           <div className="relative">
             <select
@@ -215,9 +217,7 @@ function StudentsPage() {
             />
           </div>
 
-          <span className="text-sm text-gray-500">
-            data
-          </span>
+          <span className="text-sm text-gray-500">data</span>
         </div>
 
         {/* Filter + Search */}
@@ -396,11 +396,7 @@ function StudentsPage() {
    TABLE ROW
 ============================================= */
 
-function StudentRow({
-  student,
-  onEdit,
-  onDelete,
-}) {
+function StudentRow({ student, onEdit, onDelete }) {
   return (
     <tr className="border-b border-cream-border transition last:border-b-0 hover:bg-cream-light/40">
       {/* Nama */}
@@ -416,16 +412,12 @@ function StudentRow({
 
       {/* Username */}
       <td className="px-5 py-3.5">
-        <p className="text-sm text-gray-500">
-          {student.username}
-        </p>
+        <p className="text-sm text-gray-500">{student.username}</p>
       </td>
 
       {/* Email */}
       <td className="px-5 py-3.5">
-        <p className="text-sm text-gray-500">
-          {student.email}
-        </p>
+        <p className="text-sm text-gray-500">{student.email}</p>
       </td>
 
       {/* Kelas */}
@@ -473,8 +465,7 @@ function StudentAvatar({ name }) {
     name
       ?.split("")
       .reduce(
-        (total, character) =>
-          total + character.charCodeAt(0),
+        (total, character) => total + character.charCodeAt(0),
         0
       ) % colors.length;
 
@@ -513,8 +504,7 @@ function ClassBadge({ className }) {
     className
       .split("")
       .reduce(
-        (total, character) =>
-          total + character.charCodeAt(0),
+        (total, character) => total + character.charCodeAt(0),
         0
       ) % colors.length;
 
@@ -531,12 +521,7 @@ function ClassBadge({ className }) {
    ACTION BUTTON
 ============================================= */
 
-function ActionButton({
-  icon,
-  label,
-  danger = false,
-  onClick,
-}) {
+function ActionButton({ icon, label, danger = false, onClick }) {
   return (
     <button
       type="button"
@@ -579,12 +564,7 @@ function StudentTableLoading() {
    PAGINATION
 ============================================= */
 
-function Pagination({
-  currentPage,
-  lastPage,
-  total,
-  onPageChange,
-}) {
+function Pagination({ currentPage, lastPage, total, onPageChange }) {
   if (lastPage <= 1) {
     return (
       <div className="flex justify-center text-xs text-gray-400">
@@ -606,29 +586,28 @@ function Pagination({
       </button>
 
       <div className="flex items-center gap-1">
-        {getPageNumbers(currentPage, lastPage).map(
-          (page, index) =>
-            page === "..." ? (
-              <span
-                key={`dots-${index}`}
-                className="flex h-9 w-9 items-center justify-center text-sm text-gray-400"
-              >
-                ...
-              </span>
-            ) : (
-              <button
-                key={page}
-                type="button"
-                onClick={() => onPageChange(page)}
-                className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm font-medium transition ${
-                  page === currentPage
-                    ? "bg-lime-brand text-dark"
-                    : "text-gray-500 hover:bg-cream-light hover:text-dark"
-                }`}
-              >
-                {page}
-              </button>
-            )
+        {getPageNumbers(currentPage, lastPage).map((page, index) =>
+          page === "..." ? (
+            <span
+              key={`dots-${index}`}
+              className="flex h-9 w-9 items-center justify-center text-sm text-gray-400"
+            >
+              ...
+            </span>
+          ) : (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onPageChange(page)}
+              className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm font-medium transition ${
+                page === currentPage
+                  ? "bg-lime-brand text-dark"
+                  : "text-gray-500 hover:bg-cream-light hover:text-dark"
+              }`}
+            >
+              {page}
+            </button>
+          )
         )}
       </div>
 
@@ -647,10 +626,7 @@ function Pagination({
 
 function getPageNumbers(currentPage, lastPage) {
   if (lastPage <= 5) {
-    return Array.from(
-      { length: lastPage },
-      (_, index) => index + 1
-    );
+    return Array.from({ length: lastPage }, (_, index) => index + 1);
   }
 
   if (currentPage <= 3) {

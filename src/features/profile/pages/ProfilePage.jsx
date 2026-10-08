@@ -7,12 +7,15 @@ import {
   Save,
   User,
   UserCircle,
+  LoaderCircle,
 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "../../../contexts/AuthContext";
 
 function ProfilePage() {
   const { user, updateProfile } = useAuth();
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState({
     name: "",
@@ -23,20 +26,14 @@ function ProfilePage() {
     password_confirmation: "",
   });
 
-  const [showPassword, setShowPassword] =
-    useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
-  const [showConfirmation, setShowConfirmation] =
-    useState(false);
-
-  const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     setForm({
       name: user.name || "",
@@ -47,6 +44,45 @@ function ProfilePage() {
       password_confirmation: "",
     });
   }, [user]);
+
+  /* =========================================================
+     MUTATION: UPDATE PROFILE
+  ========================================================= */
+  const updateProfileMutation = useMutation({
+    mutationFn: (payload) => updateProfile(payload),
+    onSuccess: (response) => {
+      // Refresh cache data user di React Query (jika digunakan)
+      queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+
+      setSuccess(
+        response?.message || "Profil berhasil diperbarui."
+      );
+
+      // Kosongkan form password setelah berhasil
+      setForm((prev) => ({
+        ...prev,
+        password: "",
+        password_confirmation: "",
+      }));
+    },
+    onError: (err) => {
+      console.error(err);
+      const errors = err.response?.data?.errors;
+
+      if (errors) {
+        const firstError = Object.values(errors)[0];
+        setError(
+          Array.isArray(firstError)
+            ? firstError[0]
+            : "Data yang dimasukkan tidak valid."
+        );
+      } else {
+        setError(
+          err.response?.data?.message || "Gagal memperbarui profil."
+        );
+      }
+    },
+  });
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -60,10 +96,8 @@ function ProfilePage() {
     setError("");
   }
 
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault();
-
-    setLoading(true);
     setSuccess("");
     setError("");
 
@@ -76,65 +110,21 @@ function ProfilePage() {
       username: form.username.trim(),
       email: form.email.trim(),
       class_name:
-        user.role === "student"
-          ? form.class_name.trim()
-          : null,
-      password: form.password
-        ? form.password
+        user.role === "student" ? form.class_name.trim() : null,
+      password: form.password ? form.password : null,
+      password_confirmation: form.password_confirmation
+        ? form.password_confirmation
         : null,
-      password_confirmation:
-        form.password_confirmation
-          ? form.password_confirmation
-          : null,
     };
 
-    try {
-      const response =
-        await updateProfile(payload);
-
-      setSuccess(
-        response.message ||
-          "Profil berhasil diperbarui."
-      );
-
-      /*
-       * Kosongkan password setelah berhasil.
-       */
-      setForm((prev) => ({
-        ...prev,
-        password: "",
-        password_confirmation: "",
-      }));
-    } catch (error) {
-      console.error(error);
-
-      const errors =
-        error.response?.data?.errors;
-
-      if (errors) {
-        const firstError = Object.values(
-          errors
-        )[0];
-
-        setError(
-          Array.isArray(firstError)
-            ? firstError[0]
-            : "Data yang dimasukkan tidak valid."
-        );
-      } else {
-        setError(
-          error.response?.data?.message ||
-            "Gagal memperbarui profil."
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
+    updateProfileMutation.mutate(payload);
   }
 
   if (!user) {
     return null;
   }
+
+  const loading = updateProfileMutation.isPending;
 
   return (
     <div className="mx-auto w-full max-w-4xl">
@@ -151,10 +141,7 @@ function ProfilePage() {
         </p>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-6"
-      >
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* =========================================
             PROFILE INFORMATION
         ========================================== */}
@@ -239,8 +226,7 @@ function ProfilePage() {
                 </h2>
 
                 <p className="mt-0.5 text-xs text-gray-400">
-                  Kosongkan kedua form jika tidak ingin
-                  mengubah password.
+                  Kosongkan kedua form jika tidak ingin mengubah password.
                 </p>
               </div>
             </div>
@@ -255,11 +241,7 @@ function ProfilePage() {
               onChange={handleChange}
               placeholder="Masukkan password baru"
               visible={showPassword}
-              onToggle={() =>
-                setShowPassword(
-                  (prev) => !prev
-                )
-              }
+              onToggle={() => setShowPassword((prev) => !prev)}
             />
 
             {/* Konfirmasi */}
@@ -270,11 +252,7 @@ function ProfilePage() {
               onChange={handleChange}
               placeholder="Ulangi password baru"
               visible={showConfirmation}
-              onToggle={() =>
-                setShowConfirmation(
-                  (prev) => !prev
-                )
-              }
+              onToggle={() => setShowConfirmation((prev) => !prev)}
             />
           </div>
         </section>
@@ -303,11 +281,13 @@ function ProfilePage() {
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-xl bg-dark px-5 py-3 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Save size={17} />
+            {loading ? (
+              <LoaderCircle size={17} className="animate-spin" />
+            ) : (
+              <Save size={17} />
+            )}
 
-            {loading
-              ? "Menyimpan..."
-              : "Simpan Perubahan"}
+            {loading ? "Menyimpan..." : "Simpan Perubahan"}
           </button>
         </div>
       </form>
@@ -390,16 +370,10 @@ function PasswordField({
           onClick={onToggle}
           className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-gray-400 transition hover:bg-cream-light hover:text-dark"
           aria-label={
-            visible
-              ? "Sembunyikan password"
-              : "Tampilkan password"
+            visible ? "Sembunyikan password" : "Tampilkan password"
           }
         >
-          {visible ? (
-            <EyeOff size={18} />
-          ) : (
-            <Eye size={18} />
-          )}
+          {visible ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </div>
     </div>

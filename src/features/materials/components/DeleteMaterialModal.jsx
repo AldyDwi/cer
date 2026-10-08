@@ -1,11 +1,7 @@
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 
-function DeleteMaterialModal({
-  material,
-  onClose,
-  onConfirm,
-}) {
+function DeleteMaterialModal({ material, onClose, onConfirm }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,8 +13,7 @@ function DeleteMaterialModal({
       await onConfirm();
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          "Gagal menghapus materi."
+        err.response?.data?.message || "Gagal menghapus materi."
       );
       setLoading(false);
     }
@@ -36,8 +31,9 @@ function DeleteMaterialModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             aria-label="Tutup"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -45,9 +41,7 @@ function DeleteMaterialModal({
 
         {/* Body */}
         <div className="px-6 py-5">
-          <h2 className="text-lg font-bold text-dark">
-            Hapus materi?
-          </h2>
+          <h2 className="text-lg font-bold text-dark">Hapus materi?</h2>
 
           <p className="mt-2 text-sm leading-6 text-gray-500">
             Apakah kamu yakin ingin menghapus materi{" "}
@@ -79,8 +73,9 @@ function DeleteMaterialModal({
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
+            {loading && <LoaderCircle size={16} className="animate-spin" />}
             {loading ? "Menghapus..." : "Hapus"}
           </button>
         </div>

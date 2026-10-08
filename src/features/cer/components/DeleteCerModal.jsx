@@ -1,40 +1,27 @@
-import {
-  AlertTriangle,
-  LoaderCircle,
-  X,
-} from "lucide-react";
+import { AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { useMutation } from "@tanstack/react-query";
 
 import { deleteCerQuiz } from "../services/cerService";
 
-function DeleteCerModal({
-  activity,
-  onClose,
-  onUpdated,
-}) {
-  const [loading, setLoading] = useState(false);
+function DeleteCerModal({ activity, onClose, onUpdated }) {
   const [error, setError] = useState("");
 
-  async function handleDelete() {
-    try {
-      setLoading(true);
-      setError("");
-
-      await deleteCerQuiz(activity.id);
-
-      await onUpdated();
-
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteCerQuiz(activity.id),
+    onSuccess: async () => {
+      await onUpdated?.();
       onClose();
-    } catch (err) {
+    },
+    onError: (err) => {
       setError(
-        err.response?.data?.message ||
-          "Gagal menghapus aktivitas CER."
+        err.response?.data?.message || "Gagal menghapus aktivitas CER."
       );
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+  });
+
+  const loading = deleteMutation.isPending;
 
   return createPortal(
     <div className="fixed inset-0 z-10000 flex items-center justify-center bg-black/40 p-4">
@@ -57,13 +44,10 @@ function DeleteCerModal({
 
         {/* Content */}
         <div className="px-6 py-5">
-          <h2 className="text-lg font-bold text-dark">
-            Hapus aktivitas?
-          </h2>
+          <h2 className="text-lg font-bold text-dark">Hapus aktivitas?</h2>
 
           <p className="mt-2 text-sm leading-6 text-gray-500">
-            Apakah Anda yakin ingin menghapus
-            aktivitas{" "}
+            Apakah Anda yakin ingin menghapus aktivitas{" "}
             <span className="font-semibold text-dark">
               "{activity.title}"
             </span>
@@ -71,8 +55,7 @@ function DeleteCerModal({
           </p>
 
           <p className="mt-1 text-sm leading-6 text-gray-500">
-            Data aktivitas yang telah dihapus
-            tidak dapat dikembalikan.
+            Data aktivitas yang telah dihapus tidak dapat dikembalikan.
           </p>
 
           {error && (
@@ -95,17 +78,13 @@ function DeleteCerModal({
 
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => deleteMutation.mutate()}
             disabled={loading}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading && (
-              <LoaderCircle
-                size={16}
-                className="animate-spin"
-              />
+              <LoaderCircle size={16} className="animate-spin" />
             )}
-
             {loading ? "Menghapus..." : "Hapus"}
           </button>
         </div>

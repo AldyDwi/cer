@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, X } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle, X } from "lucide-react";
 
-function StudentFormModal({
-  mode,
-  student,
-  onClose,
-  onSubmit,
-}) {
+function StudentFormModal({ mode, student, onClose, onSubmit }) {
   const isEdit = mode === "edit";
 
   const [name, setName] = useState("");
@@ -80,11 +75,6 @@ function StudentFormModal({
         class_name: className.trim(),
       };
 
-      /*
-       * Password hanya dikirim jika:
-       * - tambah student
-       * - atau update password
-       */
       if (password.trim()) {
         data.password = password;
       }
@@ -95,17 +85,12 @@ function StudentFormModal({
 
       if (errors) {
         const firstError = Object.values(errors)[0]?.[0];
-
-        setError(
-          firstError || "Data tidak valid."
-        );
+        setError(firstError || "Data tidak valid.");
       } else {
         setError(
-          err.response?.data?.message ||
-            "Terjadi kesalahan."
+          err.response?.data?.message || "Terjadi kesalahan."
         );
       }
-    } finally {
       setLoading(false);
     }
   }
@@ -117,9 +102,7 @@ function StudentFormModal({
         <div className="flex items-start justify-between border-b border-cream-border px-6 py-5">
           <div>
             <h2 className="text-lg font-bold text-dark">
-              {isEdit
-                ? "Ubah Mahasiswa"
-                : "Tambah Mahasiswa"}
+              {isEdit ? "Ubah Mahasiswa" : "Tambah Mahasiswa"}
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">
@@ -132,8 +115,9 @@ function StudentFormModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             aria-label="Tutup"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -234,13 +218,14 @@ function StudentFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-dark px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-dark px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              {loading && <LoaderCircle size={16} className="animate-spin" />}
               {loading
                 ? "Menyimpan..."
                 : isEdit
-                  ? "Update"
-                  : "Tambah"}
+                ? "Update"
+                : "Tambah"}
             </button>
           </div>
         </form>
@@ -265,9 +250,7 @@ function FormField({
       <input
         type={type}
         value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
+        onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="w-full rounded-xl border border-cream-border bg-white px-4 py-3 text-sm text-dark outline-none transition placeholder:text-gray-400 focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
       />

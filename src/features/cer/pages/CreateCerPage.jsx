@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BookOpen,
   ChevronDown,
@@ -8,19 +8,17 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { createCerQuiz } from "../services/cerService";
 import { getMaterialOptions } from "../../materials/services/materialService";
 import { useCerActivities } from "../../../contexts/CerActivityContext";
 
-
 function CreateCerPage() {
   const navigate = useNavigate();
-
+  const queryClient = useQueryClient();
   const { refreshActivities } = useCerActivities();
-  const [materials, setMaterials] = useState([]);
-  const [loadingMaterials, setLoadingMaterials] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
@@ -30,24 +28,46 @@ function CreateCerPage() {
     duration_minutes: 15,
   });
 
-  useEffect(() => {
-    loadMaterials();
-  }, []);
+  /* =========================================================
+     QUERY: FETCH MATERIAL OPTIONS
+  ========================================================= */
+  const { data: materials = [], isLoading: loadingMaterials } = useQuery({
+    queryKey: ["material-options"],
+    queryFn: getMaterialOptions,
+    staleTime: 1000 * 60 * 10,
+    select: (response) => response?.data || [],
+  });
 
-  async function loadMaterials() {
-    try {
-      const response = await getMaterialOptions();
+  /* =========================================================
+     MUTATION: CREATE CER QUIZ
+  ========================================================= */
+  const createMutation = useMutation({
+    mutationFn: createCerQuiz,
+    onSuccess: async (response) => {
+      const quiz = response?.data ?? response;
 
-      setMaterials(response.data || []);
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Gagal mengambil daftar materi."
-      );
-    } finally {
-      setLoadingMaterials(false);
-    }
-  }
+      // Invalidate cache list aktivitas
+      queryClient.invalidateQueries({ queryKey: ["cer-quizzes"] });
+
+      if (refreshActivities) {
+        await refreshActivities();
+      }
+
+      navigate(`/teacher/cer/${quiz.id}`);
+    },
+    onError: (err) => {
+      const validationErrors = err.response?.data?.errors;
+
+      if (validationErrors) {
+        const firstError = Object.values(validationErrors)[0]?.[0];
+        setError(firstError || "Data aktivitas belum lengkap.");
+      } else {
+        setError(
+          err.response?.data?.message || "Gagal membuat aktivitas CER."
+        );
+      }
+    },
+  });
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -58,52 +78,23 @@ function CreateCerPage() {
     }));
   }
 
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault();
+    setError("");
 
-    try {
-      setSubmitting(true);
-      setError("");
-
-      const response = await createCerQuiz({
-        title: form.title.trim(),
-        description: form.description.trim(),
-        material_id: Number(form.material_id),
-        duration_minutes: Number(form.duration_minutes),
-      });
-
-      const quiz = response.data;
-
-      await refreshActivities();
-
-      navigate(`/teacher/cer/${quiz.id}`);
-    } catch (err) {
-      const validationErrors = err.response?.data?.errors;
-
-      if (validationErrors) {
-        const firstError =
-          Object.values(validationErrors)[0]?.[0];
-
-        setError(
-          firstError ||
-            "Data aktivitas belum lengkap."
-        );
-      } else {
-        setError(
-          err.response?.data?.message ||
-            "Gagal membuat aktivitas CER."
-        );
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    createMutation.mutate({
+      title: form.title.trim(),
+      description: form.description.trim(),
+      material_id: Number(form.material_id),
+      duration_minutes: Number(form.duration_minutes),
+    });
   }
+
+  const submitting = createMutation.isPending;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      {/* =========================================
-          PAGE HEADER
-      ========================================== */}
+      {/* PAGE HEADER */}
       <div className="mb-7">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lime-brand text-dark">
@@ -122,9 +113,7 @@ function CreateCerPage() {
         </div>
       </div>
 
-      {/* =========================================
-          MAIN CARD
-      ========================================== */}
+      {/* MAIN CARD */}
       <div className="overflow-hidden rounded-3xl border border-cream-border bg-white shadow-sm">
         {/* Card Header */}
         <div className="border-b border-cream-border px-7 py-5">
@@ -138,13 +127,8 @@ function CreateCerPage() {
         </div>
 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_300px]">
-          {/* =========================================
-              FORM
-          ========================================== */}
-          <form
-            onSubmit={handleSubmit}
-            className="p-7"
-          >
+          {/* FORM */}
+          <form onSubmit={handleSubmit} className="p-7">
             {error && (
               <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 {error}
@@ -217,16 +201,12 @@ function CreateCerPage() {
                     </option>
 
                     {materials.map((material) => (
-                      <option
-                        key={material.id}
-                        value={material.id}
-                      >
+                      <option key={material.id} value={material.id}>
                         {material.title}
                       </option>
                     ))}
                   </select>
 
-                  {/* Chevron benar-benar center */}
                   <ChevronDown
                     size={18}
                     strokeWidth={1.8}
@@ -238,9 +218,7 @@ function CreateCerPage() {
                   Belum punya materi?{" "}
                   <button
                     type="button"
-                    onClick={() =>
-                      navigate("/teacher/materials")
-                    }
+                    onClick={() => navigate("/teacher/materials")}
                     className="font-medium text-dark underline underline-offset-2 transition hover:text-lime-hover"
                   >
                     Klik di sini
@@ -276,9 +254,7 @@ function CreateCerPage() {
                     />
                   </div>
 
-                  <span className="text-sm text-gray-500">
-                    Menit
-                  </span>
+                  <span className="text-sm text-gray-500">Menit</span>
                 </div>
               </div>
             </div>
@@ -291,22 +267,15 @@ function CreateCerPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-dark px-6 py-3 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting && (
-                  <LoaderCircle
-                    size={17}
-                    className="animate-spin"
-                  />
+                  <LoaderCircle size={17} className="animate-spin" />
                 )}
 
-                {submitting
-                  ? "Membuat..."
-                  : "Buat Aktivitas"}
+                {submitting ? "Membuat..." : "Buat Aktivitas"}
               </button>
             </div>
           </form>
 
-          {/* =========================================
-              INFORMATION PANEL
-          ========================================== */}
+          {/* INFORMATION PANEL */}
           <aside className="border-t border-cream-border bg-cream-light/60 p-7 lg:border-l lg:border-t-0">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lime-brand text-dark">
               <CircleHelp size={21} />
@@ -317,9 +286,8 @@ function CreateCerPage() {
             </h3>
 
             <p className="mt-2 text-sm leading-6 text-gray-500">
-              Aktivitas ini digunakan untuk pembelajaran
-              rekonstruksi Claim, Evidence, dan Reasoning
-              (CER).
+              Aktivitas ini digunakan untuk pembelajaran rekonstruksi Claim,
+              Evidence, dan Reasoning (CER).
             </p>
 
             <div className="my-6 h-px bg-cream-border" />
@@ -336,8 +304,7 @@ function CreateCerPage() {
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-gray-500">
-                    Materi menjadi dasar pembelajaran
-                    dalam aktivitas CER.
+                    Materi menjadi dasar pembelajaran dalam aktivitas CER.
                   </p>
                 </div>
               </div>
@@ -353,9 +320,8 @@ function CreateCerPage() {
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-gray-500">
-                    Setelah aktivitas dibuat, kamu dapat
-                    menambahkan komponen Claim, Evidence,
-                    dan Reasoning.
+                    Setelah aktivitas dibuat, kamu dapat menambahkan komponen
+                    Claim, Evidence, dan Reasoning.
                   </p>
                 </div>
               </div>
@@ -371,8 +337,8 @@ function CreateCerPage() {
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-gray-500">
-                    Aktivitas dapat dipublikasikan setelah
-                    seluruh komponen CER selesai disiapkan.
+                    Aktivitas dapat dipublikasikan setelah seluruh komponen CER
+                    selesai disiapkan.
                   </p>
                 </div>
               </div>

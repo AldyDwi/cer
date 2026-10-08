@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Plus,
   Eye,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   getMaterials,
@@ -23,10 +24,7 @@ import MaterialDetailModal from "../components/MaterialDetailModal";
 import DeleteMaterialModal from "../components/DeleteMaterialModal";
 
 function MaterialsPage() {
-  const [materials, setMaterials] = useState([]);
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -34,50 +32,81 @@ function MaterialsPage() {
   const [perPage, setPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    lastPage: 1,
-    total: 0,
-  });
-
   const [modal, setModal] = useState(null);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
 
-  async function loadMaterials() {
-    try {
-      setLoading(true);
-      setError("");
+  /* =========================================================
+     REACT QUERY DATA FETCHING
+  ========================================================= */
 
-      const response = await getMaterials({
+  const {
+    data: materialsData,
+    isLoading: loading,
+    isError,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["materials", search, perPage, currentPage],
+    queryFn: () =>
+      getMaterials({
         search,
         perPage,
         page: currentPage,
-      });
+      }),
+    staleTime: 1000 * 60 * 5, // Cache selama 5 menit
+  });
 
-      setMaterials(response.data);
+  const materials = materialsData?.data || [];
+  const pagination = {
+    currentPage: materialsData?.current_page || 1,
+    lastPage: materialsData?.last_page || 1,
+    total: materialsData?.total || 0,
+  };
 
-      setPagination({
-        currentPage: response.current_page,
-        lastPage: response.last_page,
-        total: response.total,
-      });
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Gagal mengambil data materi."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+  const error =
+    isError &&
+    (queryError?.response?.data?.message || "Gagal mengambil data materi.");
 
-  useEffect(() => {
-    loadMaterials();
-  }, [search, perPage, currentPage]);
+  /* =========================================================
+     MUTATIONS (CREATE / UPDATE / DELETE)
+  ========================================================= */
+
+  const createMutation = useMutation({
+    mutationFn: createMaterial,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      setCurrentPage(1);
+      setSearch("");
+      setSearchInput("");
+      closeModal();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => updateMaterial(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      closeModal();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteMaterial(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      // Jika data terakhir di halaman terhapus, kembali ke halaman sebelumnya
+      if (materials.length === 1 && currentPage > 1) {
+        setCurrentPage((page) => page - 1);
+      }
+      closeModal();
+    },
+  });
+
+  /* =========================================================
+     HANDLERS
+  ========================================================= */
 
   function handleSearchSubmit(event) {
     event.preventDefault();
-
     setCurrentPage(1);
     setSearch(searchInput.trim());
   }
@@ -91,7 +120,6 @@ function MaterialsPage() {
     if (page < 1 || page > pagination.lastPage) {
       return;
     }
-
     setCurrentPage(page);
   }
 
@@ -120,36 +148,19 @@ function MaterialsPage() {
     setSelectedMaterial(null);
   }
 
-  async function handleCreate(data) {
-    await createMaterial(data);
-
-    setCurrentPage(1);
-    setSearch("");
-    setSearchInput("");
-
-    await loadMaterials();
-    closeModal();
+  function handleCreate(data) {
+    return createMutation.mutateAsync(data);
   }
 
-  async function handleUpdate(data) {
-    await updateMaterial(selectedMaterial.id, data);
-
-    await loadMaterials();
-    closeModal();
+  function handleUpdate(data) {
+    return updateMutation.mutateAsync({
+      id: selectedMaterial.id,
+      data,
+    });
   }
 
-  async function handleDelete() {
-    await deleteMaterial(selectedMaterial.id);
-
-    // Kalau data terakhir di halaman terhapus,
-    // kembali ke halaman sebelumnya.
-    if (materials.length === 1 && currentPage > 1) {
-      setCurrentPage((page) => page - 1);
-    } else {
-      await loadMaterials();
-    }
-
-    closeModal();
+  function handleDelete() {
+    return deleteMutation.mutateAsync(selectedMaterial.id);
   }
 
   return (
@@ -158,9 +169,7 @@ function MaterialsPage() {
           HEADER
       ========================================== */}
       <div>
-        <h1 className="text-2xl font-bold text-dark">
-          Kelola Materi
-        </h1>
+        <h1 className="text-2xl font-bold text-dark">Kelola Materi</h1>
 
         <p className="mt-1 text-sm text-gray-500">
           Kelola materi pembelajaran yang digunakan dalam aktivitas CER.
@@ -185,38 +194,31 @@ function MaterialsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Per Page */}
         <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">
-            Tampilkan
-        </span>
+          <span className="text-sm text-gray-500">Tampilkan</span>
 
-        <div className="relative">
+          <div className="relative">
             <select
-            value={perPage}
-            onChange={handlePerPageChange}
-            className="w-16.5 appearance-none rounded-xl border border-cream-border bg-white py-2 pl-3 pr-8 text-sm font-medium text-dark outline-none transition focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
+              value={perPage}
+              onChange={handlePerPageChange}
+              className="w-16.5 appearance-none rounded-xl border border-cream-border bg-white py-2 pl-3 pr-8 text-sm font-medium text-dark outline-none transition focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
             >
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
             </select>
 
             <ChevronDown
-            size={15}
-            strokeWidth={2}
-            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500"
+              size={15}
+              strokeWidth={2}
+              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500"
             />
-        </div>
+          </div>
 
-        <span className="text-sm text-gray-500">
-            data
-        </span>
+          <span className="text-sm text-gray-500">data</span>
         </div>
 
         {/* Search */}
-        <form
-          onSubmit={handleSearchSubmit}
-          className="flex w-full sm:w-auto"
-        >
+        <form onSubmit={handleSearchSubmit} className="flex w-full sm:w-auto">
           <div className="relative w-full sm:w-72">
             <Search
               size={18}
@@ -226,9 +228,7 @@ function MaterialsPage() {
             <input
               type="text"
               value={searchInput}
-              onChange={(event) =>
-                setSearchInput(event.target.value)
-              }
+              onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Cari materi..."
               className="w-full rounded-xl border border-cream-border bg-white py-2.5 pl-10 pr-4 text-sm text-dark outline-none transition placeholder:text-gray-400 focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
             />
@@ -349,29 +349,24 @@ function MaterialCard({
 
   return (
     <article className="group flex min-h-75 flex-col rounded-3xl border border-cream-border bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md">
-      {/* Icon */}
       <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-full ${iconStyle}`}>
         <BookOpen size={20} />
       </div>
 
-      {/* Title */}
       <div>
         <h2 className="text-base font-bold leading-6 text-dark">
           {material.title}
         </h2>
       </div>
 
-      {/* Content */}
       <div className="mt-3 flex-1">
         <p className="line-clamp-4 text-sm leading-6 text-gray-500">
           {getContentPreview(material.content)}
         </p>
       </div>
 
-      {/* Divider */}
       <div className="my-5 h-px bg-cream-border" />
 
-      {/* Actions */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-400">
           Materi
@@ -426,12 +421,7 @@ function getContentPreview(content) {
    ACTION BUTTON
 ============================================= */
 
-function CardActionButton({
-  icon,
-  label,
-  danger = false,
-  onClick,
-}) {
+function CardActionButton({ icon, label, danger = false, onClick }) {
   return (
     <button
       type="button"
@@ -450,7 +440,7 @@ function CardActionButton({
 }
 
 /* =============================================
-   LOADING
+   LOADING SKELETON
 ============================================= */
 
 function MaterialLoading() {
@@ -462,9 +452,7 @@ function MaterialLoading() {
           className="h-75 animate-pulse rounded-3xl border border-cream-border bg-white p-5"
         >
           <div className="h-11 w-11 rounded-full bg-gray-100" />
-
           <div className="mt-5 h-5 w-3/4 rounded bg-gray-100" />
-
           <div className="mt-4 space-y-2">
             <div className="h-3 rounded bg-gray-100" />
             <div className="h-3 rounded bg-gray-100" />
@@ -515,12 +503,7 @@ function EmptyMaterials({ search, onCreate }) {
    PAGINATION
 ============================================= */
 
-function Pagination({
-  currentPage,
-  lastPage,
-  total,
-  onPageChange,
-}) {
+function Pagination({ currentPage, lastPage, total, onPageChange }) {
   if (lastPage <= 1) {
     return (
       <div className="flex justify-center text-xs text-gray-400">
@@ -531,7 +514,6 @@ function Pagination({
 
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
-      {/* Previous */}
       <button
         type="button"
         disabled={currentPage === 1}
@@ -542,7 +524,6 @@ function Pagination({
         <ChevronLeft size={18} />
       </button>
 
-      {/* Page Numbers */}
       <div className="flex items-center gap-1">
         {getPageNumbers(currentPage, lastPage).map((page, index) =>
           page === "..." ? (
@@ -569,7 +550,6 @@ function Pagination({
         )}
       </div>
 
-      {/* Next */}
       <button
         type="button"
         disabled={currentPage === lastPage}
@@ -585,10 +565,7 @@ function Pagination({
 
 function getPageNumbers(currentPage, lastPage) {
   if (lastPage <= 5) {
-    return Array.from(
-      { length: lastPage },
-      (_, index) => index + 1
-    );
+    return Array.from({ length: lastPage }, (_, index) => index + 1);
   }
 
   if (currentPage <= 3) {

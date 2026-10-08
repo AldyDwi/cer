@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { X, LoaderCircle } from "lucide-react";
 
-function MaterialFormModal({
-  mode,
-  material,
-  onClose,
-  onSubmit,
-}) {
+function MaterialFormModal({ mode, material, onClose, onSubmit }) {
   const isEdit = mode === "edit";
 
   const [title, setTitle] = useState("");
@@ -45,7 +40,6 @@ function MaterialFormModal({
         err.response?.data?.message ||
           "Terjadi kesalahan saat menyimpan materi."
       );
-    } finally {
       setLoading(false);
     }
   }
@@ -70,8 +64,9 @@ function MaterialFormModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             aria-label="Tutup"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -123,13 +118,14 @@ function MaterialFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-dark px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-dark px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              {loading && <LoaderCircle size={16} className="animate-spin" />}
               {loading
                 ? "Menyimpan..."
                 : isEdit
-                  ? "Update"
-                  : "Tambah"}
+                ? "Update"
+                : "Tambah"}
             </button>
           </div>
         </form>

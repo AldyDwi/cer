@@ -1,11 +1,7 @@
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 
-function DeleteStudentModal({
-  student,
-  onClose,
-  onConfirm,
-}) {
+function DeleteStudentModal({ student, onClose, onConfirm }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,10 +13,8 @@ function DeleteStudentModal({
       await onConfirm();
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          "Gagal menghapus mahasiswa."
+        err.response?.data?.message || "Gagal menghapus mahasiswa."
       );
-
       setLoading(false);
     }
   }
@@ -37,8 +31,9 @@ function DeleteStudentModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             aria-label="Tutup"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-400 transition hover:bg-cream-light hover:text-dark disabled:opacity-50"
           >
             <X size={20} />
           </button>
@@ -51,8 +46,7 @@ function DeleteStudentModal({
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-gray-500">
-            Apakah kamu yakin ingin menghapus akun
-            {" "}
+            Apakah kamu yakin ingin menghapus akun{" "}
             <span className="font-semibold text-dark">
               "{student.name}"
             </span>
@@ -60,8 +54,7 @@ function DeleteStudentModal({
           </p>
 
           <p className="mt-1 text-sm leading-6 text-gray-500">
-            Data akun mahasiswa yang sudah dihapus
-            tidak dapat dikembalikan.
+            Data akun mahasiswa yang sudah dihapus tidak dapat dikembalikan.
           </p>
 
           {error && (
@@ -86,8 +79,9 @@ function DeleteStudentModal({
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className="flex-1 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
+            {loading && <LoaderCircle size={16} className="animate-spin" />}
             {loading ? "Menghapus..." : "Hapus"}
           </button>
         </div>

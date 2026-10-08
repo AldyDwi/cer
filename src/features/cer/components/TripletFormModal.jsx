@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  LoaderCircle,
-  Plus,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { LoaderCircle, Plus, Sparkles, X } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 
 import {
   createCerItem,
@@ -30,8 +26,6 @@ function TripletFormModal({
     distractor_reasoning: "",
   });
 
-  const [loading, setLoading] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -40,72 +34,79 @@ function TripletFormModal({
         claim: triplet.claim || "",
         evidence: triplet.evidence || "",
         reasoning: triplet.reasoning || "",
-        distractor_evidence:
-          triplet.distractor_evidence || "",
-        distractor_reasoning:
-          triplet.distractor_reasoning || "",
+        distractor_evidence: triplet.distractor_evidence || "",
+        distractor_reasoning: triplet.distractor_reasoning || "",
       });
     }
   }, [isEdit, triplet]);
 
   function handleChange(event) {
     const { name, value } = event.target;
-
     setForm((prev) => ({
       ...prev,
       [name]: value,
     }));
   }
 
-  async function handleGenerateDistractor() {
-    // Validasi komponen utama terlebih dahulu
-    if (!form.claim.trim()) {
-      setError("Claim wajib diisi terlebih dahulu.");
-      return;
-    }
-
-    if (!form.evidence.trim()) {
-      setError("Evidence wajib diisi terlebih dahulu.");
-      return;
-    }
-
-    if (!form.reasoning.trim()) {
-      setError("Reasoning wajib diisi terlebih dahulu.");
-      return;
-    }
-
-    try {
-      setGenerating(true);
-      setError("");
-
-      const response = await generateDistractors(activityId, {
-        claim: form.claim.trim(),
-        evidence: form.evidence.trim(),
-        reasoning: form.reasoning.trim(),
-      });
-
+  /* =========================================================
+     MUTATION: GENERATE DISTRACTOR
+  ========================================================= */
+  const generateMutation = useMutation({
+    mutationFn: (payload) => generateDistractors(activityId, payload),
+    onSuccess: (response) => {
       const data = response?.data ?? response;
-
       setForm((prev) => ({
         ...prev,
-        distractor_evidence:
-          data?.distractor_evidence || "",
-        distractor_reasoning:
-          data?.distractor_reasoning || "",
+        distractor_evidence: data?.distractor_evidence || "",
+        distractor_reasoning: data?.distractor_reasoning || "",
       }));
-    } catch (error) {
-      console.error(error);
-
+    },
+    onError: (err) => {
       setError(
-        error.response?.data?.message ||
+        err.response?.data?.message ||
           "Gagal menghasilkan distractor. Silakan coba lagi."
       );
-    } finally {
-      setGenerating(false);
-    }
+    },
+  });
+
+  function handleGenerateDistractor() {
+    if (!form.claim.trim()) return setError("Claim wajib diisi terlebih dahulu.");
+    if (!form.evidence.trim()) return setError("Evidence wajib diisi terlebih dahulu.");
+    if (!form.reasoning.trim()) return setError("Reasoning wajib diisi terlebih dahulu.");
+
+    setError("");
+    generateMutation.mutate({
+      claim: form.claim.trim(),
+      evidence: form.evidence.trim(),
+      reasoning: form.reasoning.trim(),
+    });
   }
 
-  async function handleSubmit(event) {
+  /* =========================================================
+     MUTATION: SUBMIT FORM (CREATE / UPDATE)
+  ========================================================= */
+  const submitMutation = useMutation({
+    mutationFn: (payload) =>
+      isEdit
+        ? updateCerItem(triplet.id, payload)
+        : createCerItem(activityId, payload),
+    onSuccess: (response) => {
+      const data = response?.data ?? response;
+      if (isEdit) {
+        onUpdated?.(data);
+      } else {
+        onAdded?.(data);
+      }
+    },
+    onError: (err) => {
+      setError(
+        err.response?.data?.message ||
+          `Gagal ${isEdit ? "memperbarui" : "menambahkan"} triplet.`
+      );
+    },
+  });
+
+  function handleSubmit(event) {
     event.preventDefault();
 
     const requiredFields = [
@@ -116,63 +117,25 @@ function TripletFormModal({
       "distractor_reasoning",
     ];
 
-    const hasEmptyField = requiredFields.some(
-      (field) => !form[field].trim()
-    );
+    const hasEmptyField = requiredFields.some((field) => !form[field].trim());
 
     if (hasEmptyField) {
       setError("Semua komponen triplet harus diisi.");
       return;
     }
 
-    try {
-      setLoading(true);
-      setError("");
-
-      if (isEdit) {
-        const response = await updateCerItem(
-          triplet.id,
-          {
-            claim: form.claim.trim(),
-            evidence: form.evidence.trim(),
-            reasoning: form.reasoning.trim(),
-            distractor_evidence:
-              form.distractor_evidence.trim(),
-            distractor_reasoning:
-              form.distractor_reasoning.trim(),
-          }
-        );
-
-        onUpdated?.(response.data);
-      } else {
-        const response = await createCerItem(
-          activityId,
-          {
-            claim: form.claim.trim(),
-            evidence: form.evidence.trim(),
-            reasoning: form.reasoning.trim(),
-            distractor_evidence:
-              form.distractor_evidence.trim(),
-            distractor_reasoning:
-              form.distractor_reasoning.trim(),
-          }
-        );
-
-        onAdded?.(response.data);
-      }
-    } catch (error) {
-      console.error(error);
-
-      setError(
-        error.response?.data?.message ||
-          `Gagal ${
-            isEdit ? "memperbarui" : "menambahkan"
-          } triplet.`
-      );
-    } finally {
-      setLoading(false);
-    }
+    setError("");
+    submitMutation.mutate({
+      claim: form.claim.trim(),
+      evidence: form.evidence.trim(),
+      reasoning: form.reasoning.trim(),
+      distractor_evidence: form.distractor_evidence.trim(),
+      distractor_reasoning: form.distractor_reasoning.trim(),
+    });
   }
+
+  const isPending = submitMutation.isPending;
+  const isGenerating = generateMutation.isPending;
 
   return (
     <div
@@ -181,15 +144,11 @@ function TripletFormModal({
       aria-modal="true"
     >
       <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* =========================================
-            HEADER
-        ========================================== */}
+        {/* HEADER */}
         <div className="flex shrink-0 items-start justify-between border-b border-cream-border px-6 py-5 sm:px-7">
           <div className="min-w-0">
             <h2 className="text-lg font-bold text-dark sm:text-xl">
-              {isEdit
-                ? "Ubah Triplet CER"
-                : "Tambah Triplet CER"}
+              {isEdit ? "Ubah Triplet CER" : "Tambah Triplet CER"}
             </h2>
 
             <p className="mt-1 text-sm text-gray-400">
@@ -209,24 +168,16 @@ function TripletFormModal({
           </button>
         </div>
 
-        {/* =========================================
-            FORM BODY
-        ========================================== */}
-        <form
-          onSubmit={handleSubmit}
-          className="min-h-0 overflow-y-auto"
-        >
+        {/* FORM BODY */}
+        <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto">
           <div className="p-6 sm:p-7">
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* ====================================
-                  KOMPONEN UTAMA
-              ===================================== */}
+              {/* KOMPONEN UTAMA */}
               <section className="rounded-2xl bg-cream-light/70 p-5">
                 <div className="mb-5">
                   <h3 className="text-sm font-bold text-dark">
                     Komponen Utama
                   </h3>
-
                   <p className="mt-1 text-xs leading-5 text-gray-400">
                     Komponen CER yang menjadi jawaban utama.
                   </p>
@@ -240,7 +191,6 @@ function TripletFormModal({
                     onChange={handleChange}
                     placeholder="Masukkan claim..."
                   />
-
                   <TextAreaField
                     label="Evidence"
                     name="evidence"
@@ -248,7 +198,6 @@ function TripletFormModal({
                     onChange={handleChange}
                     placeholder="Masukkan evidence..."
                   />
-
                   <TextAreaField
                     label="Reasoning"
                     name="reasoning"
@@ -259,15 +208,12 @@ function TripletFormModal({
                 </div>
               </section>
 
-              {/* ====================================
-                  KOMPONEN PENGECOH
-              ===================================== */}
+              {/* KOMPONEN PENGECOH */}
               <section className="rounded-2xl bg-red-50/60 p-5">
                 <div className="mb-5">
                   <h3 className="text-sm font-bold text-dark">
                     Komponen Pengecoh
                   </h3>
-
                   <p className="mt-1 text-xs leading-5 text-gray-400">
                     Komponen yang digunakan sebagai distractor.
                   </p>
@@ -281,7 +227,6 @@ function TripletFormModal({
                     onChange={handleChange}
                     placeholder="Masukkan distractor evidence..."
                   />
-
                   <TextAreaField
                     label="Distractor Reasoning"
                     name="distractor_reasoning"
@@ -301,51 +246,39 @@ function TripletFormModal({
             )}
           </div>
 
-          {/* =========================================
-              FOOTER
-          ========================================== */}
+          {/* FOOTER */}
           <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-cream-border bg-white px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
             <button
               type="button"
               onClick={handleGenerateDistractor}
-              disabled={generating || loading}
+              disabled={isGenerating || isPending}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-600 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {generating ? (
-                <LoaderCircle
-                  size={17}
-                  className="animate-spin"
-                />
+              {isGenerating ? (
+                <LoaderCircle size={17} className="animate-spin" />
               ) : (
                 <Sparkles size={17} />
               )}
-
-              {generating
-                ? "Menghasilkan..."
-                : "Generate Distractor"}
+              {isGenerating ? "Menghasilkan..." : "Generate Distractor"}
             </button>
 
             <button
               type="submit"
-              disabled={loading || generating}
+              disabled={isPending || isGenerating}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-dark px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? (
-                <LoaderCircle
-                  size={17}
-                  className="animate-spin"
-                />
+              {isPending ? (
+                <LoaderCircle size={17} className="animate-spin" />
               ) : (
                 <Plus size={17} />
               )}
-
-              {loading
+              {isPending
                 ? isEdit
                   ? "Memperbarui..."
                   : "Menambahkan..."
                 : isEdit
-                  ? "Update"
-                  : "Tambah"}
+                ? "Update"
+                : "Tambah"}
             </button>
           </div>
         </form>
@@ -354,22 +287,12 @@ function TripletFormModal({
   );
 }
 
-function TextAreaField({
-  label,
-  name,
-  value,
-  onChange,
-  placeholder,
-}) {
+function TextAreaField({ label, name, value, onChange, placeholder }) {
   return (
     <div>
-      <label
-        htmlFor={name}
-        className="mb-2 block text-sm font-semibold text-dark"
-      >
+      <label htmlFor={name} className="mb-2 block text-sm font-semibold text-dark">
         {label}
       </label>
-
       <textarea
         id={name}
         name={name}

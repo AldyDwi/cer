@@ -1,9 +1,4 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  LoaderCircle,
-  X,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, LoaderCircle, X } from "lucide-react";
 
 function UpdateStatusModal({
   targetStatus,
@@ -20,11 +15,7 @@ function UpdateStatusModal({
       aria-modal="true"
     >
       <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl">
-        {/* =========================================
-            CONTENT
-        ========================================== */}
         <div className="px-6 py-6 sm:px-7">
-          {/* Icon + Close */}
           <div className="flex items-start justify-between">
             <div
               className={`flex h-11 w-11 items-center justify-center rounded-xl ${
@@ -51,14 +42,10 @@ function UpdateStatusModal({
             </button>
           </div>
 
-          {/* Title */}
           <h2 className="mt-5 text-lg font-bold text-dark">
-            {isPublishing
-              ? "Publikasikan aktivitas?"
-              : "Kembalikan ke draft?"}
+            {isPublishing ? "Publikasikan aktivitas?" : "Kembalikan ke draft?"}
           </h2>
 
-          {/* Description */}
           <p className="mt-2 text-sm leading-6 text-gray-500">
             {isPublishing
               ? "Aktivitas akan dapat diakses oleh mahasiswa setelah dipublikasikan. Komponen CER juga tidak dapat ditambah, diubah, atau dihapus selama aktivitas berstatus published."
@@ -66,9 +53,6 @@ function UpdateStatusModal({
           </p>
         </div>
 
-        {/* =========================================
-            FOOTER
-        ========================================== */}
         <div className="flex gap-3 border-t border-cream-border px-6 py-4 sm:px-7">
           <button
             type="button"
@@ -90,17 +74,13 @@ function UpdateStatusModal({
             }`}
           >
             {loading && (
-              <LoaderCircle
-                size={17}
-                className="animate-spin"
-              />
+              <LoaderCircle size={17} className="animate-spin" />
             )}
-
             {loading
               ? "Memproses..."
               : isPublishing
-                ? "Publikasikan"
-                : "Kembali ke Draft"}
+              ? "Publikasikan"
+              : "Kembali ke Draft"}
           </button>
         </div>
       </div>

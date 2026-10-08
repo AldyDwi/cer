@@ -1,54 +1,59 @@
-import { useEffect, useState } from "react";
-import {
-  ChevronDown,
-  X,
-  LoaderCircle,
-} from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, X, LoaderCircle } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { updateCerQuiz } from "../services/cerService";
 import { getMaterialOptions } from "../../materials/services/materialService";
 
-function EditCerModal({
-  activity,
-  onClose,
-  onUpdated,
-}) {
-  const [materials, setMaterials] = useState([]);
+function EditCerModal({ activity, onClose, onUpdated }) {
+  const queryClient = useQueryClient();
 
   const [form, setForm] = useState({
     title: activity.title || "",
     description: activity.description || "",
     material_id: activity.material_id || "",
-    duration_minutes:
-      activity.duration_minutes || "",
+    duration_minutes: activity.duration_minutes || "",
   });
 
-  const [loadingMaterials, setLoadingMaterials] =
-    useState(true);
-
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadMaterials();
-  }, []);
+  /* =========================================================
+     QUERY: FETCH MATERIAL OPTIONS (WITH CACHING)
+  ========================================================= */
+  const { data: materials = [], isLoading: loadingMaterials } = useQuery({
+    queryKey: ["material-options"],
+    queryFn: getMaterialOptions,
+    staleTime: 1000 * 60 * 10, // Cache daftar materi selama 10 menit
+    select: (response) => response?.data || [],
+  });
 
-  async function loadMaterials() {
-    try {
-      const response =
-        await getMaterialOptions();
+  /* =========================================================
+     MUTATION: UPDATE CER QUIZ
+  ========================================================= */
+  const updateMutation = useMutation({
+    mutationFn: (payload) => updateCerQuiz(activity.id, payload),
+    onSuccess: async () => {
+      // Invalidate cache aktivitas spesifik & daftar aktivitas
+      queryClient.invalidateQueries({ queryKey: ["cer-quiz", activity.id] });
+      queryClient.invalidateQueries({ queryKey: ["cer-quizzes"] });
 
-      setMaterials(response.data || []);
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          "Gagal mengambil materi."
-      );
-    } finally {
-      setLoadingMaterials(false);
-    }
-  }
+      await onUpdated?.();
+      onClose();
+    },
+    onError: (err) => {
+      const validationErrors = err.response?.data?.errors;
+
+      if (validationErrors) {
+        const firstError = Object.values(validationErrors)[0]?.[0];
+        setError(firstError || "Data aktivitas tidak valid.");
+      } else {
+        setError(
+          err.response?.data?.message || "Gagal mengubah aktivitas CER."
+        );
+      }
+    },
+  });
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -59,59 +64,27 @@ function EditCerModal({
     }));
   }
 
-  async function handleSubmit(event) {
+  function handleSubmit(event) {
     event.preventDefault();
+    setError("");
 
-    try {
-      setSubmitting(true);
-      setError("");
-
-      await updateCerQuiz(activity.id, {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        material_id: Number(form.material_id),
-        duration_minutes: Number(
-          form.duration_minutes
-        ),
-      });
-
-      await onUpdated();
-
-      onClose();
-    } catch (err) {
-      const validationErrors =
-        err.response?.data?.errors;
-
-      if (validationErrors) {
-        const firstError =
-          Object.values(validationErrors)[0]?.[0];
-
-        setError(
-          firstError ||
-            "Data aktivitas tidak valid."
-        );
-      } else {
-        setError(
-          err.response?.data?.message ||
-            "Gagal mengubah aktivitas CER."
-        );
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    updateMutation.mutate({
+      title: form.title.trim(),
+      description: form.description.trim(),
+      material_id: Number(form.material_id),
+      duration_minutes: Number(form.duration_minutes),
+    });
   }
+
+  const submitting = updateMutation.isPending;
 
   return createPortal(
     <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl">
-        {/* =========================================
-            HEADER
-        ========================================== */}
+        {/* HEADER */}
         <div className="flex items-start justify-between border-b border-cream-border px-6 py-5">
           <div>
-            <h2 className="text-lg font-bold text-dark">
-              Ubah Aktivitas CER
-            </h2>
+            <h2 className="text-lg font-bold text-dark">Ubah Aktivitas CER</h2>
 
             <p className="mt-1 text-sm text-gray-500">
               Perbarui informasi aktivitas CER.
@@ -128,9 +101,7 @@ function EditCerModal({
           </button>
         </div>
 
-        {/* =========================================
-            FORM
-        ========================================== */}
+        {/* FORM */}
         <form onSubmit={handleSubmit}>
           <div className="space-y-5 p-6">
             {error && (
@@ -196,16 +167,11 @@ function EditCerModal({
                   className="w-full appearance-none rounded-xl border border-cream-border bg-white py-3 pl-4 pr-10 text-sm text-dark outline-none transition focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
                 >
                   <option value="">
-                    {loadingMaterials
-                      ? "Memuat materi..."
-                      : "Pilih materi"}
+                    {loadingMaterials ? "Memuat materi..." : "Pilih materi"}
                   </option>
 
                   {materials.map((material) => (
-                    <option
-                      key={material.id}
-                      value={material.id}
-                    >
+                    <option key={material.id} value={material.id}>
                       {material.title}
                     </option>
                   ))}
@@ -239,34 +205,23 @@ function EditCerModal({
                   className="w-28 rounded-xl border border-cream-border bg-white px-4 py-3 text-sm text-dark outline-none transition focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
                 />
 
-                <span className="text-sm text-gray-500">
-                  Menit
-                </span>
+                <span className="text-sm text-gray-500">Menit</span>
               </div>
             </div>
           </div>
 
-          {/* =========================================
-              FOOTER
-          ========================================== */}
+          {/* FOOTER */}
           <div className="flex justify-end border-t border-cream-border px-6 py-4">
             <button
               type="submit"
-              disabled={
-                submitting || loadingMaterials
-              }
+              disabled={submitting || loadingMaterials}
               className="inline-flex items-center gap-2 rounded-xl bg-dark px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting && (
-                <LoaderCircle
-                  size={16}
-                  className="animate-spin"
-                />
+                <LoaderCircle size={16} className="animate-spin" />
               )}
 
-              {submitting
-                ? "Menyimpan..."
-                : "Update"}
+              {submitting ? "Menyimpan..." : "Update"}
             </button>
           </div>
         </form>
