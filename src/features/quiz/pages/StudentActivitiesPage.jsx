@@ -1,6 +1,6 @@
-
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   BookOpen,
   CheckCircle2,
@@ -54,47 +54,28 @@ function formatDate(date) {
 
 export default function StudentActivitiesPage() {
   const navigate = useNavigate();
-
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    let active = true;
+  // Menggunakan React Query untuk mengambil daftar aktivitas
+  const {
+    data: activitiesData,
+    isLoading,
+    isFetching,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ["student-published-activities"],
+    queryFn: getPublishedStudentActivities,
+    select: (response) => (Array.isArray(response?.data) ? response.data : []),
+    refetchInterval: 5000, 
+    refetchOnWindowFocus: true,
+  });
 
-    async function loadActivities() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await getPublishedStudentActivities();
-
-        if (active) {
-          setActivities(
-            Array.isArray(response?.data) ? response.data : []
-          );
-        }
-      } catch (error) {
-        console.error(error);
-
-        if (active) {
-          setError(
-            error.response?.data?.message ||
-              "Gagal memuat daftar aktivitas CER."
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    loadActivities();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const activities = activitiesData || [];
+  const errorMessage =
+    queryError?.response?.data?.message ||
+    queryError?.message ||
+    (queryError ? "Gagal memuat daftar aktivitas CER." : "");
 
   const keyword = search.trim().toLowerCase();
 
@@ -109,7 +90,6 @@ export default function StudentActivitiesPage() {
   return (
     <div className="min-h-[calc(100vh-72px)]">
       <div className="mx-auto max-w-7xl px-5 py-8 sm:px-7 sm:py-10 lg:px-8">
-
         {/* Heading */}
         <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
@@ -123,8 +103,8 @@ export default function StudentActivitiesPage() {
             </h1>
 
             <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500 sm:text-base">
-              Pilih aktivitas yang tersedia dan susun komponen
-              Claim, Evidence, dan Reasoning untuk melatih pemahamanmu.
+              Pilih aktivitas yang tersedia dan susun komponen Claim, Evidence,
+              dan Reasoning untuk melatih pemahamanmu.
             </p>
           </div>
 
@@ -142,7 +122,7 @@ export default function StudentActivitiesPage() {
         {/* Search and count */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-500">
-            {loading
+            {isLoading
               ? "Memuat aktivitas..."
               : `${filteredActivities.length} aktivitas tersedia`}
           </p>
@@ -164,14 +144,14 @@ export default function StudentActivitiesPage() {
         </div>
 
         {/* Error */}
-        {error && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
+        {errorMessage && (
+          <div className="mb-6 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <span>{errorMessage}</span>
 
             <button
               type="button"
-              onClick={() => window.location.reload()}
-              className="ml-2 font-semibold underline"
+              onClick={() => refetch()}
+              className="ml-2 font-semibold underline hover:text-red-700"
             >
               Coba lagi
             </button>
@@ -179,7 +159,7 @@ export default function StudentActivitiesPage() {
         )}
 
         {/* Activity cards */}
-        {loading ? (
+        {isLoading ? (
           <ActivitySkeleton />
         ) : filteredActivities.length > 0 ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -226,9 +206,7 @@ export default function StudentActivitiesPage() {
                     </div>
 
                     <div className="min-w-0">
-                      <p className="text-xs text-gray-400">
-                        Dosen pengampu
-                      </p>
+                      <p className="text-xs text-gray-400">Dosen pengampu</p>
 
                       <p className="truncate font-medium text-dark">
                         {activity.teacher?.name || "Dosen"}
@@ -248,9 +226,7 @@ export default function StudentActivitiesPage() {
                   <div className="mb-5 flex items-center gap-2 border-t border-cream-border pt-4 text-sm text-gray-500">
                     <Clock3 size={16} />
 
-                    <span>
-                      Durasi {activity.duration_minutes} menit
-                    </span>
+                    <span>Durasi {activity.duration_minutes} menit</span>
                   </div>
 
                   {/* Score */}
@@ -271,9 +247,9 @@ export default function StudentActivitiesPage() {
                     type="button"
                     onClick={() => {
                       if (activity.completed) {
-                        navigate(`/student/quiz/${activity.id}/result`);
+                        navigate(`/student/cer/${activity.id}/review`);
                       } else {
-                        navigate(`/student/quiz/${activity.id}`);
+                        navigate(`/student/cer/${activity.id}/attempt`);
                       }
                     }}
                     className={`mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
@@ -313,6 +289,13 @@ export default function StudentActivitiesPage() {
                 : "Aktivitas akan muncul di sini setelah dosen memublikasikannya."}
             </p>
           </div>
+        )}
+
+        {/* Indikator background refetching */}
+        {isFetching && !isLoading && (
+          <p className="mt-4 text-center text-xs text-gray-400">
+            Memperbarui data aktivitas...
+          </p>
         )}
       </div>
     </div>

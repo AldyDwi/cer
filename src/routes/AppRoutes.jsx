@@ -12,6 +12,8 @@ import ManageCerPage from "../features/cer/pages/ManageCerPage";
 import ProfilePage from "../features/profile/pages/ProfilePage";
 import GradeRecapPage from "../features/cer/pages/GradeRecapPage";
 import StudentActivitiesPage from "../features/quiz/pages/StudentActivitiesPage";
+import StudentCerAttemptPage from "../features/quiz/pages/StudentCerAttemptPage";
+import StudentCerReviewPage from "../features/quiz/pages/StudentCerReviewPage";
 
 import { ROLES } from "../constants/roles";
 
@@ -92,8 +94,21 @@ function AppRoutes() {
       >
         <Route index element={<StudentActivitiesPage />} />
 
-        <Route path="profile" element={<ProfilePage />} />
+        <Route 
+          path="profile" 
+          element={<ProfilePage />} 
+        />
+
+        <Route
+          path="/student/cer/:id/attempt"
+          element={<StudentCerAttemptPage />}
+        />
       </Route>
+
+      <Route
+        path="/student/cer/:id/review"
+        element={<StudentCerReviewPage />}
+      />
     </Routes>
   );
 }

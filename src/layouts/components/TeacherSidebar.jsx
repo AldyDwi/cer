@@ -275,9 +275,22 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
                       key={activity.id}
                       activity={activity}
                       onUpdated={() => {
+                        // 1. Invalidate cache daftar kuis guru (sidebar & list)
                         queryClient.invalidateQueries({
                           queryKey: ["cer-quizzes"],
                         });
+
+                        // 2. Invalidate cache detail kuis yang sedang dibuka guru
+                        queryClient.invalidateQueries({
+                          queryKey: ["cer-quiz", String(activity.id)],
+                        });
+
+                        // 3. Invalidate cache daftar kuis siswa
+                        queryClient.invalidateQueries({
+                          queryKey: ["student-published-activities"],
+                        });
+
+                        // 4. Refresh context jika ada
                         refreshActivities?.();
                       }}
                     />
@@ -446,7 +459,10 @@ function SidebarActivity({ activity, onUpdated }) {
   const [modal, setModal] = useState(null);
 
   // Pengecekan apakah path lokasi saat ini sesuai dengan aktivitas ini
-  const isActive = location.pathname.startsWith(`/teacher/cer/${activity.id}`);
+  const activityPath = `/teacher/cer/${activity.id}`;
+  const isActive = 
+    location.pathname === activityPath || 
+    location.pathname.startsWith(`${activityPath}/`);
 
   function handleOpenMenu(event) {
     event.stopPropagation();
