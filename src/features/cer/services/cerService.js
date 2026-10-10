@@ -94,3 +94,8 @@ export async function getGradeRecap(quizId) {
 
   return response.data;
 }
+
+export async function getPublishedStudentActivities() {
+  const response = await api.get("/student/cer-quizzes");
+  return response.data;
+}

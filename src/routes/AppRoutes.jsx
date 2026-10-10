@@ -2,15 +2,16 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "../features/auth/pages/LoginPage";
 import TeacherLayout from "../layouts/TeacherLayout";
+import StudentLayout from "../layouts/StudentLayout";
 import RoleRoute from "./RoleRoute";
 import GuestRoute from "./GuestRoute";
-import StudentHome from "../features/students/pages/StudentHome";
 import MaterialsPage from "../features/materials/pages/MaterialsPage";
 import StudentsPage from "../features/students/pages/StudentsPage";
 import CreateCerPage from "../features/cer/pages/CreateCerPage";
 import ManageCerPage from "../features/cer/pages/ManageCerPage";
 import ProfilePage from "../features/profile/pages/ProfilePage";
 import GradeRecapPage from "../features/cer/pages/GradeRecapPage";
+import StudentActivitiesPage from "../features/quiz/pages/StudentActivitiesPage";
 
 import { ROLES } from "../constants/roles";
 
@@ -84,19 +85,15 @@ function AppRoutes() {
       <Route
         path="/student"
         element={
-            <RoleRoute allowedRoles={[ROLES.STUDENT]}>
-            <StudentHome />
-            </RoleRoute>
+          <RoleRoute allowedRoles={[ROLES.STUDENT]}>
+            <StudentLayout />
+          </RoleRoute>
         }
-      />
+      >
+        <Route index element={<StudentActivitiesPage />} />
 
-      {/* =========================================
-          UNKNOWN ROUTE
-      ========================================== */}
-      <Route
-        path="*"
-        element={<Navigate to="/" replace />}
-      />
+        <Route path="profile" element={<ProfilePage />} />
+      </Route>
     </Routes>
   );
 }
