@@ -145,7 +145,7 @@ function ResultBadge({ correct, answered }) {
   );
 }
 
-function AnswerReview({ item, slot }) {
+function AnswerReview({ item, slot, showCorrectAnswers = true }) {
   const answer = item.answer;
 
   const selectedCard = getSelectedCard(
@@ -214,8 +214,8 @@ function AnswerReview({ item, slot }) {
         </div>
       </div>
 
-      {/* Kunci jawaban */}
-      {!isCorrect && (
+      {/* Kunci jawaban (Hanya dikontrol oleh properti show_keys) */}
+      {!isCorrect && showCorrectAnswers && (
         <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-green-800">
             Jawaban yang benar
@@ -235,7 +235,7 @@ function AnswerReview({ item, slot }) {
   );
 }
 
-function TripletReview({ item, index }) {
+function TripletReview({ item, index, showCorrectAnswers }) {
   const [expanded, setExpanded] = useState(true);
 
   const correctCount = getCorrectCount(item);
@@ -306,6 +306,7 @@ function TripletReview({ item, index }) {
                 key={slot.key}
                 item={item}
                 slot={slot}
+                showCorrectAnswers={showCorrectAnswers}
               />
             ))}
           </div>
@@ -336,7 +337,7 @@ export default function StudentCerReviewPage() {
       return response.data;
     },
     enabled: Boolean(id),
-    staleTime: 1000 * 60 * 5, // Cache data selama 5 menit
+    staleTime: 1000 * 60 * 5,
   });
 
   /* =========================================================
@@ -345,7 +346,6 @@ export default function StudentCerReviewPage() {
   useEffect(() => {
     const channel = echo.channel("cer-activities");
 
-    // Tangani event update/edit aktivitas dari Dosen jika mempengaruhi review
     channel.listen(".activity.updated", (event) => {
       if (Number(event?.activity_id ?? event?.id) === Number(id)) {
         queryClient.invalidateQueries({
@@ -384,6 +384,7 @@ export default function StudentCerReviewPage() {
       : 0;
 
   const score = Number(attempt?.score ?? 0);
+  const showCorrectAnswers = quiz?.show_keys ?? true;
 
   if (loading) {
     return (
@@ -600,8 +601,7 @@ export default function StudentCerReviewPage() {
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Buka setiap triplet untuk meninjau jawabanmu dan
-              membandingkannya dengan kunci jawaban.
+              Buka setiap triplet untuk meninjau jawabanmu{showCorrectAnswers ? " dan membandingkannya dengan kunci jawaban." : "."}
             </p>
           </div>
 
@@ -612,6 +612,7 @@ export default function StudentCerReviewPage() {
                   key={item.id}
                   item={item}
                   index={index}
+                  showCorrectAnswers={showCorrectAnswers}
                 />
               ))}
             </div>

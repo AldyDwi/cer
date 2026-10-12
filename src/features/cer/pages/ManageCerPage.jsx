@@ -4,6 +4,12 @@ import {
   BookOpen,
   Clock3,
   ClipboardList,
+  Eye,
+  X,
+  CheckCircle2,
+  GripVertical,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -13,13 +19,43 @@ import TripletFormModal from "../components/TripletFormModal";
 import TripletAccordionItem from "../components/TripletAccordionItem";
 import UpdateStatusModal from "../components/UpdateStatusModal";
 import CerPageSkeleton from "../components/CerPageSkeleton";
+import PreviewCerModal from "../components/PreviewCerModal";
 
 import {
   getCerQuiz,
   getCerItems,
   updateCerQuizStatus,
+  updateCerQuiz,
 } from "../services/cerService";
+import api from "../../../services/api";
 import echo from "../../../utils/echo";
+
+const SLOTS = [
+  {
+    key: "claim",
+    label: "Claim",
+    description: "Pernyataan utama",
+    number: "01",
+    accent: "border-violet-300 bg-violet-50/70",
+    badge: "bg-violet-600",
+  },
+  {
+    key: "evidence",
+    label: "Evidence",
+    description: "Data atau fakta pendukung",
+    number: "02",
+    accent: "border-sky-300 bg-sky-50/70",
+    badge: "bg-sky-600",
+  },
+  {
+    key: "reasoning",
+    label: "Reasoning",
+    description: "Hubungan bukti dan klaim",
+    number: "03",
+    accent: "border-amber-300 bg-amber-50/70",
+    badge: "bg-amber-500",
+  },
+];
 
 function ManageCerPage() {
   const { id } = useParams();
@@ -28,6 +64,7 @@ function ManageCerPage() {
 
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showTripletForm, setShowTripletForm] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [openTripletId, setOpenTripletId] = useState(null);
 
   /* =========================================================
@@ -62,6 +99,29 @@ function ManageCerPage() {
   });
 
   /* =========================================================
+     TOGGLE TAMPILAN KUNCI JAWABAN
+  ========================================================= */
+  const toggleKeysMutation = useMutation({
+    mutationFn: (showKeys) => updateCerQuiz(id, { show_keys: showKeys }),
+    onSuccess: () => {
+      toast.success("Pengaturan penayangan kunci jawaban berhasil diperbarui!");
+      queryClient.invalidateQueries({ queryKey: ["cer-quiz", id] });
+    },
+    onError: (error) => {
+      console.error("Gagal memperbarui show_keys:", error);
+      toast.error(
+        error.response?.data?.message || "Gagal memperbarui pengaturan kunci jawaban."
+      );
+    },
+  });
+
+  function handleToggleShowKeys() {
+    if (!activity) return;
+    const currentVal = activity.show_keys ?? true;
+    toggleKeysMutation.mutate(!currentVal);
+  }
+
+  /* =========================================================
      WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
   ========================================================= */
   useEffect(() => {
@@ -69,7 +129,6 @@ function ManageCerPage() {
 
     const channel = echo.channel("cer-activities");
 
-    // Invalidate info aktivitas & item CER jika ada pembaruan
     channel.listen(".activity.updated", () => {
       queryClient.invalidateQueries({ queryKey: ["cer-quiz", id] });
       queryClient.invalidateQueries({ queryKey: ["cer-items", id] });
@@ -88,7 +147,6 @@ function ManageCerPage() {
     mutationFn: ({ quizId, status }) => updateCerQuizStatus(quizId, status),
     onSuccess: () => {
       toast.success("Status aktivitas berhasil diperbarui!");
-      // Refresh cache info aktivitas setelah status diubah
       queryClient.invalidateQueries({ queryKey: ["cer-quiz", id] });
       setShowStatusModal(false);
     },
@@ -106,7 +164,7 @@ function ManageCerPage() {
   }
 
   /* =========================================================
-     TRIPLET HANDLERS (Manual cache update / Invalidation)
+     TRIPLET HANDLERS
   ========================================================= */
 
   function handleTripletAdded() {
@@ -142,6 +200,8 @@ function ManageCerPage() {
       </div>
     );
   }
+
+  const showKeysValue = activity.show_keys ?? true;
 
   return (
     <div className="mx-auto w-full max-w-7xl">
@@ -180,7 +240,7 @@ function ManageCerPage() {
           </div>
 
           {/* RIGHT */}
-          <div className="flex flex-col items-start gap-4 lg:items-end">
+          <div className="flex flex-col items-start gap-3 lg:items-end">
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-500">
                 Status
@@ -199,14 +259,25 @@ function ManageCerPage() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => navigate(`/teacher/cer/${activity.id}/grades`)}
-              className="inline-flex items-center gap-2 rounded-xl border border-cream-border bg-white px-4 py-2.5 text-sm font-semibold text-dark transition hover:bg-cream-light"
-            >
-              <ClipboardList size={17} />
-              Rekap Nilai
-            </button>
+            <div className="flex flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/teacher/cer/${activity.id}/grades`)}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-white px-3 py-2 text-xs font-semibold text-dark transition hover:bg-cream-light sm:px-4 sm:py-2.5 sm:text-sm"
+              >
+                <ClipboardList size={16} className="shrink-0" />
+                <span className="whitespace-nowrap">Rekap Nilai</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(true)}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-[#F5FCE9] px-3 py-2 injection-btn text-xs font-semibold text-dark transition hover:bg-[#EAF8D3] sm:px-4 sm:py-2.5 sm:text-sm"
+              >
+                <Eye size={16} className="shrink-0 text-[#5C8C00]" />
+                <span className="whitespace-nowrap">Preview</span>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -224,14 +295,44 @@ function ManageCerPage() {
             </p>
           </div>
 
+          {/* HANYA TAMPIL JIKA STATUS AKTIVITAS ADALAH DRAFT */}
           {activity.status === "draft" && (
-            <button
-              type="button"
-              onClick={() => setShowTripletForm(true)}
-              className="inline-flex items-center justify-center rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90"
-            >
-              Tambah Triplet
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* TOGGLE TAMPILAN JAWABAN BENAR UNTUK REVIEW STUDENT */}
+              <button
+                type="button"
+                onClick={handleToggleShowKeys}
+                disabled={toggleKeysMutation.isPending}
+                className={`inline-flex items-center gap-3 rounded-2xl border px-3.5 py-2 text-xs font-bold transition-all duration-200 shadow-sm ${
+                  showKeysValue
+                    ? "border-lime-brand bg-[#F5FCE9] text-dark"
+                    : "border-cream-border bg-white text-slate-500 hover:bg-cream-light"
+                }`}
+              >
+                <div
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                    showKeysValue ? "bg-lime-brand" : "bg-slate-200"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                      showKeysValue ? "translate-x-4" : "translate-x-0"
+                    }`}
+                  />
+                </div>
+
+                <span className="whitespace-nowrap">Tampilkan Kunci Jawaban</span>
+              </button>
+
+              {/* TOMBOL TAMBAH TRIPLET */}
+              <button
+                type="button"
+                onClick={() => setShowTripletForm(true)}
+                className="inline-flex items-center justify-center rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90"
+              >
+                Tambah Triplet
+              </button>
+            </div>
           )}
         </div>
 
@@ -267,6 +368,15 @@ function ManageCerPage() {
           </div>
         )}
       </section>
+
+      {/* MODAL PREVIEW (Terisi Jawaban Benar & Read-only Drag and Drop) */}
+      {showPreviewModal && (
+        <PreviewCerModal
+          activity={activity}
+          triplets={triplets}
+          onClose={() => setShowPreviewModal(false)}
+        />
+      )}
 
       {/* ADD TRIPLET MODAL */}
       {showTripletForm && activity.status === "draft" && (
