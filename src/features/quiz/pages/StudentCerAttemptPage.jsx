@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import api from "../../../services/api";
 import echo from "../../../utils/echo";
+import logoImg from "../../../assets/logo.png";
 
 const AUTOSAVE_INTERVAL = 10_000;
 
@@ -57,6 +58,15 @@ const EMPTY_ANSWER = {
   evidence_card_id: null,
   reasoning_card_id: null,
 };
+
+function shuffleArray(array) {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 function formatTime(totalSeconds) {
   const safe = Math.max(0, Number(totalSeconds) || 0);
@@ -208,6 +218,46 @@ export default function StudentCerAttemptPage() {
 
   const currentItem = items[currentIndex] ?? null;
 
+  /* =========================================================
+     PENGACAKAN KARTU (SHUFFLE CARDS) PER ITEM
+  ========================================================= */
+const shuffledCards = useMemo(() => {
+    if (!currentItem?.cards || currentItem.cards.length === 0) return [];
+
+    // Key unik berdasarkan ID quiz dan ID item
+    const storageKey = `cer_cards_order_${quizId}_${currentItem.id}`;
+
+    // 1. Cek apakah urutan acak sudah ada di localStorage
+    const savedOrder = localStorage.getItem(storageKey);
+
+    if (savedOrder) {
+      try {
+        const orderIds = JSON.parse(savedOrder);
+        
+        // Petakan kartu sesuai urutan ID yang tersimpan
+        const cardMap = new Map(currentItem.cards.map((c) => [Number(c.id), c]));
+        const orderedCards = orderIds
+          .map((cardId) => cardMap.get(Number(cardId)))
+          .filter(Boolean); // Buang jika ada ID yang tak valid
+
+        // Jika jumlah kartu cocok, gunakan urutan tersimpan
+        if (orderedCards.length === currentItem.cards.length) {
+          return orderedCards;
+        }
+      } catch (e) {
+        console.error("Gagal membaca urutan kartu dari localStorage", e);
+      }
+    }
+
+    // 2. Jika belum ada di localStorage, acak baru dan simpan
+    const newShuffled = shuffleArray(currentItem.cards);
+    const newOrderIds = newShuffled.map((card) => card.id);
+    
+    localStorage.setItem(storageKey, JSON.stringify(newOrderIds));
+
+    return newShuffled;
+  }, [quizId, currentItem?.id, currentItem?.cards]);
+
   const currentAnswer = currentItem
     ? answers[currentItem.id] ?? EMPTY_ANSWER
     : EMPTY_ANSWER;
@@ -248,7 +298,6 @@ export default function StudentCerAttemptPage() {
   useEffect(() => {
     const channel = echo.channel("cer-activities");
 
-    // Tangani event update/edit aktivitas dari Dosen
     channel.listen(".activity.updated", (event) => {
       if (Number(event?.activity_id ?? event?.id) === Number(quizId)) {
         setErrorMessage(
@@ -257,7 +306,6 @@ export default function StudentCerAttemptPage() {
       }
     });
 
-    // Tangani event submit jika pengerjaan diselesaikan dari sesi/tab lain
     channel.listen(".attempt.submitted", (event) => {
       if (Number(event?.quiz_id ?? event?.activity_id) === Number(quizId)) {
         navigate(`/student/cer/${quizId}/review`, { replace: true });
@@ -620,6 +668,12 @@ export default function StudentCerAttemptPage() {
         payload
       );
 
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith(`cer_cards_order_${quizId}_`)) {
+          localStorage.removeItem(key);
+        }
+      });
+
       dirtyRef.current = false;
       setSaveStatus("saved");
 
@@ -666,15 +720,27 @@ export default function StudentCerAttemptPage() {
 
     autoSubmitTriggeredRef.current = true;
     handleSubmit(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remainingSeconds, attempt?.status]);
 
+  /* =========================================================
+     LOADING SKELETON UI BARU
+  ========================================================= */
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-cream-light">
-        <div className="flex items-center gap-3 text-slate-600">
-          <LoaderCircle className="h-6 w-6 animate-spin" />
-          <span>Memuat aktivitas CER...</span>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-cream-light p-6">
+        <div className="flex flex-col items-center">
+          <img
+            src={logoImg}
+            alt="Reka-CER Logo"
+            className="h-14 w-14 animate-pulse object-contain rounded-2xl"
+          />
+
+          <div className="mt-5 flex items-center gap-2">
+            <LoaderCircle size={18} className="animate-spin text-dark" />
+            <span className="text-sm font-medium text-gray-500">
+              Memuat aktivitas CER...
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -760,8 +826,8 @@ export default function StudentCerAttemptPage() {
       `}</style>
 
       <main className="min-h-screen bg-cream-light pb-12 text-slate-900">
-        {/* Header aktivitas */}
-        <header className="sticky top-0 z-20 border-b border-cream-border bg-cream-light/95 backdrop-blur">
+        {/* Header aktivitas - Progress Bar Diperbaiki di Dalam Header Sticky */}
+        <header className="sticky top-[-10.5px] z-20 border-b border-cream-border bg-cream-light/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="min-w-0">
               <button
@@ -802,6 +868,7 @@ export default function StudentCerAttemptPage() {
             </div>
           </div>
 
+          {/* Garis hijau pengerjaan dipastikan berada di dalam header sticky */}
           <div className="h-1 bg-cream-border">
             <div
               className="h-full bg-lime-brand transition-[width] duration-500"
@@ -962,7 +1029,7 @@ export default function StudentCerAttemptPage() {
               </div>
             </div>
 
-            {/* Pilihan kartu: 5 kartu tampil horizontal di layar sedang/besar */}
+            {/* Pilihan kartu: Kartu yang ditampilkan diacak posisinya */}
             <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
@@ -975,13 +1042,13 @@ export default function StudentCerAttemptPage() {
                 </div>
 
                 <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                  {currentItem.cards?.length ?? 0} kartu
+                  {shuffledCards.length} kartu
                 </span>
               </div>
 
               {/* Grid 5 Kolom Horizontal */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                {(currentItem.cards ?? []).map((card, index) => {
+                {shuffledCards.map((card, index) => {
                   const selectedSlot = SLOTS.find(
                     (slot) =>
                       Number(currentAnswer[slot.key]) === Number(card.id)
@@ -1088,7 +1155,7 @@ export default function StudentCerAttemptPage() {
                   type="button"
                   onClick={() => setShowSubmitModal(true)}
                   disabled={submitting || isDeadlineReached}
-                  className="inline-flex items-center gap-2 rounded-xl bg-lime-brand px-4 py-2.5 text-xs font-extrabold text-slate-900 transition hover:-translate-y-0.5 hover:bg-lime-hover disabled:opacity-50 sm:text-sm"
+                  className="inline-flex items-center gap-2 rounded-xl bg-lime-brand px-4 py-2.5 text-xs font-bold text-slate-900 transition hover:-translate-y-0.5 hover:bg-lime-hover disabled:opacity-50 sm:text-sm"
                 >
                   <Send className="h-4 w-4" />
                   Selesaikan
@@ -1359,7 +1426,7 @@ export default function StudentCerAttemptPage() {
                 type="button"
                 onClick={() => handleSubmit(false)}
                 disabled={submitting}
-                className="inline-flex items-center gap-2 rounded-xl bg-lime-brand px-4 py-2.5 text-sm font-extrabold text-slate-900 transition hover:bg-lime-hover disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl bg-lime-brand px-4 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-lime-hover disabled:opacity-60"
               >
                 {submitting && (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
