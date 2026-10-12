@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   CheckCircle2,
@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { getPublishedStudentActivities } from "../../cer/services/cerService";
+import echo from "../../../utils/echo";
 
 function ActivitySkeleton() {
   return (
@@ -54,9 +55,12 @@ function formatDate(date) {
 
 export default function StudentActivitiesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
-  // Menggunakan React Query untuk mengambil daftar aktivitas
+  /* =========================================================
+     REACT QUERY DATA FETCHING
+  ========================================================= */
   const {
     data: activitiesData,
     isLoading,
@@ -67,9 +71,34 @@ export default function StudentActivitiesPage() {
     queryKey: ["student-published-activities"],
     queryFn: getPublishedStudentActivities,
     select: (response) => (Array.isArray(response?.data) ? response.data : []),
-    refetchInterval: 5000, 
-    refetchOnWindowFocus: true,
+    staleTime: 0, // Paksa React Query menganggap data selalu perlu di-fetch ulang saat di-invalidate
+    refetchOnWindowFocus: true, // Auto refetch ketika mahasiswa kembali membuka tab browser ini
   });
+
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    const handleActivityUpdate = () => {
+      // Force invalidate & refetch data aktivitas siswa secara otomatis
+      queryClient.invalidateQueries({
+        queryKey: ["student-published-activities"],
+        refetchType: "all", // Refetch semua query terkait, baik yang aktif maupun inactive
+      });
+    };
+
+    // Tangani pembaruan aktivitas dari Dosen (publish, edit, delete, ganti materi)
+    channel.listen(".activity.updated", handleActivityUpdate);
+
+    // Tangani pembaruan status pengerjaan siswa saat disubmit
+    channel.listen(".attempt.submitted", handleActivityUpdate);
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [queryClient]);
 
   const activities = activitiesData || [];
   const errorMessage =

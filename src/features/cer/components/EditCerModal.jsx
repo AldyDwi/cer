@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronDown, X, LoaderCircle } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import { updateCerQuiz } from "../services/cerService";
 import { getMaterialOptions } from "../../materials/services/materialService";
@@ -34,6 +35,7 @@ function EditCerModal({ activity, onClose, onUpdated }) {
   const updateMutation = useMutation({
     mutationFn: (payload) => updateCerQuiz(activity.id, payload),
     onSuccess: async () => {
+      toast.success("Aktivitas CER berhasil diperbarui!");
       // Invalidate cache aktivitas spesifik & daftar aktivitas
       queryClient.invalidateQueries({ queryKey: ["cer-quiz", activity.id] });
       queryClient.invalidateQueries({ queryKey: ["cer-quizzes"] });
@@ -47,9 +49,13 @@ function EditCerModal({ activity, onClose, onUpdated }) {
       if (validationErrors) {
         const firstError = Object.values(validationErrors)[0]?.[0];
         setError(firstError || "Data aktivitas tidak valid.");
+        toast.error("Data aktivitas tidak valid.");
       } else {
+        toast.error(
+          err.response?.data?.message || "Gagal memperbarui aktivitas CER."
+        );
         setError(
-          err.response?.data?.message || "Gagal mengubah aktivitas CER."
+          err.response?.data?.message || "Gagal memperbarui aktivitas CER."
         );
       }
     },

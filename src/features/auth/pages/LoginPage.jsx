@@ -1,4 +1,5 @@
 import LoginForm from "../components/LoginForm";
+import logoImg from "../../../assets/logo.png";
 
 function LoginPage() {
   return (
@@ -25,9 +26,11 @@ function LoginPage() {
           <div className="relative z-10 flex h-full w-full flex-col justify-between px-8 py-8 lg:px-10 xl:px-12">
             {/* Logo */}
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-lime-brand text-lg font-black text-dark shadow-lg shadow-lime-brand/10">
-                R
-              </div>
+              <img 
+                src={logoImg} 
+                alt="Logo Reka-CER" 
+                className="h-11 w-11 object-contain rounded-2xl shadow-lg shadow-lime-brand/10" 
+              />
 
               <div>
                 <h1 className="text-lg font-bold tracking-tight text-white">

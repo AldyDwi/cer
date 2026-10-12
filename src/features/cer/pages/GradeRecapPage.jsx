@@ -10,8 +10,9 @@ import {
   Award,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getGradeRecap, getCerQuiz } from "../services/cerService";
+import echo from "../../../utils/echo";
 
 const colorStyles = [
   "bg-lime-brand text-dark",
@@ -40,6 +41,7 @@ function getClassColor(className) {
 function GradeRecapPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -57,8 +59,33 @@ function GradeRecapPage() {
     queryKey: ["cer-grades", id],
     queryFn: () => getGradeRecap(id),
     enabled: !!id,
+    staleTime: 0,
     select: (response) => response?.data ?? response,
   });
+
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = echo.channel("cer-activities");
+
+    // Invalidate query rekap nilai saat mahasiswa mengirimkan pengerjaan
+    channel.listen(".attempt.submitted", () => {
+      queryClient.invalidateQueries({ queryKey: ["cer-grades", id], refetchType: "all", });
+    });
+
+    // Invalidate query detail aktivitas & rekap nilai jika ada pembaruan aktivitas
+    channel.listen(".activity.updated", () => {
+      queryClient.invalidateQueries({ queryKey: ["cer-quiz", id], refetchType: "all", });
+      queryClient.invalidateQueries({ queryKey: ["cer-grades", id], refetchType: "all", });
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [id, queryClient]);
 
   const activity = activityQuery.data;
   const students = Array.isArray(gradesQuery.data) ? gradesQuery.data : [];
@@ -73,30 +100,6 @@ function GradeRecapPage() {
   /* =========================================================
      AVERAGE SCORE CALCULATION
   ========================================================= */
-  const averageScore = useMemo(() => {
-    const validScores = students
-      .map((student) => Number(student.score))
-      .filter((score) => !isNaN(score) && score > 0);
-
-    if (validScores.length === 0) return 0;
-
-    const total = validScores.reduce((sum, current) => sum + current, 0);
-    const avg = total / validScores.length;
-
-    // Jika desimal bulat, tampilkan tanpa desimal, jika tidak tampilkan max 1 desimal
-    return Number.isInteger(avg) ? avg : avg.toFixed(1);
-  }, [students]);
-
-  const classes = useMemo(() => {
-    return [
-      ...new Set(
-        students
-          .map((student) => student.class_name)
-          .filter(Boolean)
-      ),
-    ].sort();
-  }, [students]);
-
   const filteredStudents = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
@@ -112,6 +115,30 @@ function GradeRecapPage() {
       return matchesSearch && matchesClass;
     });
   }, [students, search, classFilter]);
+
+  const averageScore = useMemo(() => {
+    const validScores = filteredStudents
+      .map((student) => Number(student.score))
+      .filter((score) => !isNaN(score) && score > 0);
+
+    if (validScores.length === 0) return 0;
+
+    const total = validScores.reduce((sum, current) => sum + current, 0);
+    const avg = total / validScores.length;
+
+    // Jika desimal bulat, tampilkan tanpa desimal, jika tidak tampilkan max 1 desimal
+    return Number.isInteger(avg) ? avg : avg.toFixed(1);
+  }, [filteredStudents]);
+
+  const classes = useMemo(() => {
+    return [
+      ...new Set(
+        students
+          .map((student) => student.class_name)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [students]);
 
   const totalPages = Math.max(
     1,
@@ -362,45 +389,12 @@ function GradeRecapPage() {
 
         {/* Pagination */}
         {!loading && filteredStudents.length > 0 && (
-          <div className="mt-5 flex items-center justify-between">
-            <button
-              type="button"
-              disabled={page === 1}
-              onClick={() => setPage((current) => current - 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-cream-border bg-white text-gray-500 transition hover:bg-cream-light disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronLeft size={17} />
-            </button>
-
-            <div className="flex items-center gap-1">
-              {Array.from(
-                { length: totalPages },
-                (_, index) => index + 1
-              ).map((pageNumber) => (
-                <button
-                  key={pageNumber}
-                  type="button"
-                  onClick={() => setPage(pageNumber)}
-                  className={`h-9 min-w-9 rounded-lg px-2 text-sm font-medium transition ${
-                    page === pageNumber
-                      ? "bg-dark text-white"
-                      : "text-gray-500 hover:bg-cream-light"
-                  }`}
-                >
-                  {pageNumber}
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              disabled={page === totalPages}
-              onClick={() => setPage((current) => current + 1)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-cream-border bg-white text-gray-500 transition hover:bg-cream-light disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
+          <Pagination
+            currentPage={page}
+            lastPage={totalPages}
+            total={filteredStudents.length}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
         )}
       </div>
     </div>
@@ -555,6 +549,97 @@ function formatCompletedAt(date) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function Pagination({ currentPage, lastPage, total, onPageChange }) {
+  if (lastPage <= 1) {
+    return (
+      <div className="flex justify-center pt-3 text-xs text-gray-400">
+        {total} mahasiswa
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-2 pt-4">
+      <button
+        type="button"
+        disabled={currentPage === 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        aria-label="Halaman sebelumnya"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-cream-border bg-white text-gray-500 transition hover:bg-cream-light hover:text-dark disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronLeft size={18} />
+      </button>
+
+      <div className="flex items-center gap-1">
+        {getPageNumbers(currentPage, lastPage).map((pageNumber, index) =>
+          pageNumber === "..." ? (
+            <span
+              key={`dots-${index}`}
+              className="flex h-9 w-9 items-center justify-center text-sm text-gray-400"
+            >
+              ...
+            </span>
+          ) : (
+            <button
+              key={pageNumber}
+              type="button"
+              onClick={() => onPageChange(pageNumber)}
+              className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-sm font-medium transition ${
+                pageNumber === currentPage
+                  ? "bg-lime-brand text-dark font-bold"
+                  : "text-gray-500 hover:bg-cream-light hover:text-dark"
+              }`}
+            >
+              {pageNumber}
+            </button>
+          )
+        )}
+      </div>
+
+      <button
+        type="button"
+        disabled={currentPage === lastPage}
+        onClick={() => onPageChange(currentPage + 1)}
+        aria-label="Halaman selanjutnya"
+        className="flex h-9 w-9 items-center justify-center rounded-xl border border-cream-border bg-white text-gray-500 transition hover:bg-cream-light hover:text-dark disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+function getPageNumbers(currentPage, lastPage) {
+  if (lastPage <= 5) {
+    return Array.from({ length: lastPage }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 3) {
+    return [1, 2, 3, 4, "...", lastPage];
+  }
+
+  if (currentPage >= lastPage - 2) {
+    return [
+      1,
+      "...",
+      lastPage - 3,
+      lastPage - 2,
+      lastPage - 1,
+      lastPage,
+    ];
+  }
+
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    lastPage,
+  ];
 }
 
 export default GradeRecapPage;

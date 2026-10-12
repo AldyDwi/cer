@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
 } from "react";
 
 import { getCerQuizzes } from "../features/cer/services/cerService";
@@ -13,33 +14,34 @@ export function CerActivityProvider({ children }) {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  async function loadActivities() {
+  // Parameter isInitial untuk membedakan initial load dan background refresh
+  const loadActivities = useCallback(async (isInitial = false) => {
     try {
-      setLoading(true);
+      if (isInitial) {
+        setLoading(true);
+      }
 
       const response = await getCerQuizzes();
 
       setActivities(response.data || []);
     } catch (error) {
-      console.error(
-        "Gagal mengambil aktivitas CER:",
-        error
-      );
-
+      console.error("Gagal mengambil aktivitas CER:", error);
       setActivities([]);
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
-  }
+  }, []);
 
   useEffect(() => {
-    loadActivities();
-  }, []);
+    loadActivities(true); // Memuat pertama kali dengan indikator loading
+  }, [loadActivities]);
 
   const value = {
     activities,
     loading,
-    refreshActivities: loadActivities,
+    refreshActivities: () => loadActivities(false), // Refresh tanpa memicu skeleton loader
   };
 
   return (

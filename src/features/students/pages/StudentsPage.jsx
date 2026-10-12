@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus,
   Pencil,
@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import {
   getStudents,
@@ -20,6 +21,7 @@ import {
 
 import StudentFormModal from "../components/StudentFormModal";
 import DeleteStudentModal from "../components/DeleteStudentModal";
+import echo from "../../../utils/echo";
 
 function StudentsPage() {
   const queryClient = useQueryClient();
@@ -56,6 +58,22 @@ function StudentsPage() {
     staleTime: 1000 * 60 * 5, // Cache data selama 5 menit
   });
 
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    // Invalidate daftar mahasiswa jika ada pembaruan data student / profil
+    channel.listen(".activity.updated", () => {
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [queryClient]);
+
   const students = studentsData?.data || [];
   const classes = studentsData?.classes || [];
 
@@ -77,28 +95,46 @@ function StudentsPage() {
   const createMutation = useMutation({
     mutationFn: createStudent,
     onSuccess: () => {
+      toast.success("Mahasiswa baru berhasil ditambahkan!");
       queryClient.invalidateQueries({ queryKey: ["students"] });
       setCurrentPage(1);
       closeModal();
+    },
+    onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal menambahkan mahasiswa baru."
+      );
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => updateStudent(id, data),
     onSuccess: () => {
+      toast.success("Data mahasiswa berhasil diperbarui!");
       queryClient.invalidateQueries({ queryKey: ["students"] });
       closeModal();
+    },
+    onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal memperbarui data mahasiswa."
+      );
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteStudent(id),
     onSuccess: () => {
+      toast.success("Mahasiswa berhasil dihapus!");
       queryClient.invalidateQueries({ queryKey: ["students"] });
       if (students.length === 1 && currentPage > 1) {
         setCurrentPage((page) => page - 1);
       }
       closeModal();
+    },
+    onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal menghapus mahasiswa."
+      );
     },
   });
 

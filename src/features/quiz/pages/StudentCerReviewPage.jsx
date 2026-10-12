@@ -1,6 +1,6 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
   ChevronUp,
 } from "lucide-react";
 import api from "../../../services/api";
+import echo from "../../../utils/echo";
 
 const CER_SLOTS = [
   {
@@ -158,7 +159,7 @@ function AnswerReview({ item, slot }) {
   const answered = answer?.[slot.answerKey] != null;
 
   return (
-    <div className="rounded-xl border border-[#E5E0D0] bg-[#FCFBF6] p-3 sm:p-4">
+    <div className="rounded-xl border border-cream-border bg-[#FCFBF6] p-3 sm:p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <span
@@ -207,7 +208,7 @@ function AnswerReview({ item, slot }) {
             )
           )}
 
-          <p className="whitespace-pre-line break-words text-sm leading-6 text-slate-700">
+          <p className="whitespace-pre-line wrap-break-word text-sm leading-6 text-slate-700">
             {selectedCard?.content ?? "Kamu belum memilih kartu."}
           </p>
         </div>
@@ -223,7 +224,7 @@ function AnswerReview({ item, slot }) {
           <div className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
 
-            <p className="whitespace-pre-line break-words text-sm leading-6 text-green-900">
+            <p className="whitespace-pre-line wrap-break-word text-sm leading-6 text-green-900">
               {correctCard?.content ??
                 "Kunci jawaban tidak tersedia."}
             </p>
@@ -241,7 +242,7 @@ function TripletReview({ item, index }) {
   const answer = item.answer;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-[#E5E0D0] bg-white shadow-sm">
+    <section className="overflow-hidden rounded-2xl border border-cream-border bg-white shadow-sm">
       <button
         type="button"
         onClick={() => setExpanded((previous) => !previous)}
@@ -292,7 +293,7 @@ function TripletReview({ item, index }) {
       </button>
 
       {expanded && (
-        <div className="border-t border-[#E5E0D0] p-3 sm:p-5">
+        <div className="border-t border-cream-border p-3 sm:p-5">
           {!answer && (
             <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
               Data jawaban untuk triplet ini tidak ditemukan.
@@ -317,52 +318,56 @@ function TripletReview({ item, index }) {
 export default function StudentCerReviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const [quiz, setQuiz] = useState(null);
-  const [attempt, setAttempt] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  /* =========================================================
+     REACT QUERY DATA FETCHING
+  ========================================================= */
+  const {
+    data: reviewData,
+    isLoading: loading,
+    isError,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ["student-cer-review", id],
+    queryFn: async () => {
+      const response = await api.get(`/student/cer-quizzes/${id}/review`);
+      return response.data;
+    },
+    enabled: Boolean(id),
+    staleTime: 1000 * 60 * 5, // Cache data selama 5 menit
+  });
 
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
   useEffect(() => {
-    let cancelled = false;
+    const channel = echo.channel("cer-activities");
 
-    async function loadReview() {
-      setLoading(true);
-      setErrorMessage("");
-
-      try {
-        const response = await api.get(
-          `/student/cer-quizzes/${id}/review`
-        );
-
-        if (cancelled) return;
-
-        const data = response.data;
-
-        setQuiz(data.quiz ?? null);
-        setAttempt(data.attempt ?? null);
-        setItems(Array.isArray(data.items) ? data.items : []);
-      } catch (error) {
-        if (cancelled) return;
-
-        setErrorMessage(
-          error.response?.data?.message ??
-            "Hasil pengerjaan tidak dapat dimuat."
-        );
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+    // Tangani event update/edit aktivitas dari Dosen jika mempengaruhi review
+    channel.listen(".activity.updated", (event) => {
+      if (Number(event?.activity_id ?? event?.id) === Number(id)) {
+        queryClient.invalidateQueries({
+          queryKey: ["student-cer-review", id],
+        });
       }
-    }
-
-    loadReview();
+    });
 
     return () => {
-      cancelled = true;
+      echo.leaveChannel("cer-activities");
     };
-  }, [id]);
+  }, [id, queryClient]);
+
+  const quiz = reviewData?.quiz ?? null;
+  const attempt = reviewData?.attempt ?? null;
+  const items = Array.isArray(reviewData?.items) ? reviewData.items : [];
+
+  const errorMessage =
+    isError &&
+    (queryError?.response?.data?.message ??
+      queryError?.message ??
+      "Hasil pengerjaan tidak dapat dimuat.");
 
   const totalComponents = items.length * 3;
 
@@ -382,7 +387,7 @@ export default function StudentCerReviewPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#FBF8EE]">
+      <main className="flex min-h-screen items-center justify-center bg-cream-light">
         <div className="flex items-center gap-3 text-slate-600">
           <LoaderCircle className="h-6 w-6 animate-spin" />
           <span>Memuat hasil pengerjaan...</span>
@@ -393,8 +398,8 @@ export default function StudentCerReviewPage() {
 
   if (errorMessage || !quiz || !attempt) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#FBF8EE] p-5">
-        <section className="w-full max-w-lg rounded-2xl border border-[#E5E0D0] bg-white p-6 shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-cream-light p-5">
+        <section className="w-full max-w-lg rounded-2xl border border-cream-border bg-white p-6 shadow-sm">
           <AlertCircle className="mb-3 h-8 w-8 text-red-500" />
 
           <h1 className="text-lg font-extrabold text-slate-900">
@@ -406,23 +411,33 @@ export default function StudentCerReviewPage() {
               "Data hasil pengerjaan tidak ditemukan. Pastikan aktivitas sudah diselesaikan."}
           </p>
 
-          <button
-            type="button"
-            onClick={() => navigate("/student")}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Kembali ke daftar aktivitas
-          </button>
+          <div className="mt-5 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 rounded-xl border border-cream-border bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+            >
+              Coba lagi
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/student")}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Kembali ke daftar aktivitas
+            </button>
+          </div>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#FBF8EE] text-slate-900">
+    <main className="min-h-screen overflow-x-hidden bg-cream-light text-slate-900">
       {/* Header */}
-      <header className="border-b border-[#E5E0D0] bg-white">
+      <header className="border-b border-cream-border bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-500">
@@ -437,7 +452,7 @@ export default function StudentCerReviewPage() {
           <button
             type="button"
             onClick={() => navigate("/student")}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#E5E0D0] bg-[#FCFBF6] px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-[#8BEB00] hover:bg-[#F5FCE9] sm:px-4 sm:text-sm"
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cream-border bg-[#FCFBF6] px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-lime-brand hover:bg-[#F5FCE9] sm:px-4 sm:text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">
@@ -447,9 +462,9 @@ export default function StudentCerReviewPage() {
           </button>
         </div>
 
-        <div className="h-1 bg-[#E5E0D0]">
+        <div className="h-1 bg-cream-border">
           <div
-            className="h-full bg-[#8BEB00]"
+            className="h-full bg-lime-brand"
             style={{ width: `${percentage}%` }}
           />
         </div>
@@ -457,7 +472,7 @@ export default function StudentCerReviewPage() {
 
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
         {/* Kartu nilai */}
-        <section className="overflow-hidden rounded-2xl border border-[#E5E0D0] bg-white shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-cream-border bg-white shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_240px]">
             <div className="p-5 sm:p-7">
               <div className="flex items-center gap-2">
@@ -495,12 +510,12 @@ export default function StudentCerReviewPage() {
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center border-t border-[#E5E0D0] bg-[#FCFBF6] p-6 text-center md:border-l md:border-t-0">
+            <div className="flex flex-col items-center justify-center border-t border-cream-border bg-[#FCFBF6] p-6 text-center md:border-l md:border-t-0">
               <p className="text-xs font-bold text-slate-500">
                 Nilai akhir
               </p>
 
-              <div className="mt-2 flex h-28 w-28 items-center justify-center rounded-full border-[7px] border-[#E5E0D0] bg-white">
+              <div className="mt-2 flex h-28 w-28 items-center justify-center rounded-full border-[7px] border-cream-border bg-white">
                 <div className="flex flex-col items-center">
                   <span className="text-3xl font-extrabold tracking-tight text-slate-900">
                     {Number.isFinite(score)
@@ -525,7 +540,7 @@ export default function StudentCerReviewPage() {
 
         {/* Informasi pengerjaan */}
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="flex items-start gap-3 rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm">
+          <div className="flex items-start gap-3 rounded-2xl border border-cream-border bg-white p-4 shadow-sm">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50">
               <Clock3 className="h-5 w-5 text-sky-700" />
             </div>
@@ -541,7 +556,7 @@ export default function StudentCerReviewPage() {
             </div>
           </div>
 
-          <div className="flex items-start gap-3 rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm">
+          <div className="flex items-start gap-3 rounded-2xl border border-cream-border bg-white p-4 shadow-sm">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50">
               <ClipboardCheck className="h-5 w-5 text-violet-700" />
             </div>
@@ -560,7 +575,7 @@ export default function StudentCerReviewPage() {
 
         {/* Materi */}
         {quiz.material && (
-          <section className="flex items-start gap-3 rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm sm:p-5">
+          <section className="flex items-start gap-3 rounded-2xl border border-cream-border bg-white p-4 shadow-sm sm:p-5">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50">
               <BookOpen className="h-5 w-5 text-violet-700" />
             </div>
@@ -601,7 +616,7 @@ export default function StudentCerReviewPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-[#E5E0D0] bg-white p-6 text-center">
+            <div className="rounded-2xl border border-cream-border bg-white p-6 text-center">
               <p className="text-sm text-slate-500">
                 Tidak ada data triplet untuk ditampilkan.
               </p>
@@ -610,7 +625,7 @@ export default function StudentCerReviewPage() {
         </section>
 
         {/* Footer */}
-        <footer className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-[#E5E0D0] bg-white p-5 sm:flex-row">
+        <footer className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-cream-border bg-white p-5 sm:flex-row">
           <div>
             <h3 className="text-sm font-extrabold">
               Sudah meninjau hasilmu?
@@ -625,7 +640,7 @@ export default function StudentCerReviewPage() {
           <button
             type="button"
             onClick={() => navigate("/student")}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#8BEB00] px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:-translate-y-0.5 hover:bg-[#7CD300] sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-lime-brand px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:-translate-y-0.5 hover:bg-lime-hover sm:w-auto"
           >
             <ArrowLeft className="h-4 w-4" />
             Kembali ke daftar aktivitas

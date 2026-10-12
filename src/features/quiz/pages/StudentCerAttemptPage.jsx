@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import api from "../../../services/api";
+import echo from "../../../utils/echo";
 
 const AUTOSAVE_INTERVAL = 10_000;
 
@@ -240,6 +241,33 @@ export default function StudentCerAttemptPage() {
       ? new Date(deadlineInfo.timestamp).toISOString()
       : null
   );
+
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    // Tangani event update/edit aktivitas dari Dosen
+    channel.listen(".activity.updated", (event) => {
+      if (Number(event?.activity_id ?? event?.id) === Number(quizId)) {
+        setErrorMessage(
+          "Aktivitas ini telah diperbarui oleh dosen. Jawabanmu tetap aman."
+        );
+      }
+    });
+
+    // Tangani event submit jika pengerjaan diselesaikan dari sesi/tab lain
+    channel.listen(".attempt.submitted", (event) => {
+      if (Number(event?.quiz_id ?? event?.activity_id) === Number(quizId)) {
+        navigate(`/student/cer/${quizId}/review`, { replace: true });
+      }
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [quizId, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -587,7 +615,7 @@ export default function StudentCerAttemptPage() {
         answers: toAnswerPayload(answersRef.current),
       };
 
-      const response = await api.post(
+      await api.post(
         `/student/cer-quizzes/${quizId}/attempt/submit`,
         payload
       );
@@ -603,7 +631,7 @@ export default function StudentCerAttemptPage() {
       navigate("/student", {
         replace: true,
       });
-      
+
     } catch (error) {
       const status = error.response?.status;
 
@@ -643,7 +671,7 @@ export default function StudentCerAttemptPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-[#FBF8EE]">
+      <div className="flex min-h-[60vh] items-center justify-center bg-cream-light">
         <div className="flex items-center gap-3 text-slate-600">
           <LoaderCircle className="h-6 w-6 animate-spin" />
           <span>Memuat aktivitas CER...</span>
@@ -654,7 +682,7 @@ export default function StudentCerAttemptPage() {
 
   if (errorMessage && !quiz) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-[#FBF8EE] p-6">
+      <div className="flex min-h-[60vh] items-center justify-center bg-cream-light p-6">
         <div className="w-full max-w-lg rounded-2xl border border-red-200 bg-white p-6 shadow-sm">
           <AlertCircle className="mb-3 h-8 w-8 text-red-500" />
           <h1 className="text-lg font-bold text-slate-900">
@@ -674,8 +702,8 @@ export default function StudentCerAttemptPage() {
 
   if (!quiz || !currentItem) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-[#FBF8EE] p-6">
-        <div className="max-w-lg rounded-2xl border border-[#E5E0D0] bg-white p-6">
+      <div className="flex min-h-[60vh] items-center justify-center bg-cream-light p-6">
+        <div className="max-w-lg rounded-2xl border border-cream-border bg-white p-6">
           <h1 className="font-bold text-slate-900">Belum ada triplet CER</h1>
           <p className="mt-2 text-sm text-slate-600">
             Aktivitas ini belum memiliki item untuk dikerjakan.
@@ -731,9 +759,9 @@ export default function StudentCerAttemptPage() {
         }
       `}</style>
 
-      <main className="min-h-screen bg-[#FBF8EE] pb-12 text-slate-900">
+      <main className="min-h-screen bg-cream-light pb-12 text-slate-900">
         {/* Header aktivitas */}
-        <header className="sticky top-0 z-20 border-b border-[#E5E0D0] bg-[#FBF8EE]/95 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b border-cream-border bg-cream-light/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="min-w-0">
               <button
@@ -754,7 +782,7 @@ export default function StudentCerAttemptPage() {
               className={`shrink-0 rounded-xl border px-3 py-1.5 text-right ${
                 isLowTime
                   ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-[#E5E0D0] bg-white text-slate-800"
+                  : "border-cream-border bg-white text-slate-800"
               }`}
             >
               <div className="flex items-center justify-end gap-2">
@@ -774,7 +802,7 @@ export default function StudentCerAttemptPage() {
             </div>
           </div>
 
-          <div className="h-1 bg-[#E5E0D0]">
+          <div className="h-1 bg-cream-border">
             <div
               className="h-full bg-lime-brand transition-[width] duration-500"
               style={{
@@ -806,7 +834,7 @@ export default function StudentCerAttemptPage() {
                   onClick={() => setIsSidebarOpen(true)}
                   aria-expanded={isSidebarOpen}
                   aria-controls="student-cer-summary-sidebar"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#E5E0D0] bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-lime-brand hover:shadow-md sm:text-sm"
+                  className="inline-flex items-center gap-2 rounded-xl border border-cream-border bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-lime-brand hover:shadow-md sm:text-sm"
                 >
                   <PanelRightOpen className="h-4 w-4 text-[#5C8C00]" />
                   Ringkasan
@@ -816,7 +844,7 @@ export default function StudentCerAttemptPage() {
                   type="button"
                   onClick={() => setShowMaterialModal(true)}
                   disabled={!quiz.material}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#E5E0D0] bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-lime-brand hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cream-border bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-lime-brand hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                 >
                   <BookOpen className="h-4 w-4 text-violet-600" />
                   Lihat materi
@@ -825,7 +853,7 @@ export default function StudentCerAttemptPage() {
             </div>
 
             {/* Slot CER horizontal */}
-            <div className="rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm sm:p-5">
+            <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-extrabold sm:text-base">
@@ -868,12 +896,12 @@ export default function StudentCerAttemptPage() {
                         }
                       }}
                       onDrop={(event) => handleDrop(event, slot.key)}
-                      className={`cer-motion relative flex min-h-[140px] flex-col rounded-xl border-2 border-dashed p-3.5 transition-all duration-200 ease-out ${
+                      className={`cer-motion relative flex min-h-35 flex-col rounded-xl border-2 border-dashed p-3.5 transition-all duration-200 ease-out ${
                         isActive
                           ? "cer-drop-active scale-[1.01] border-lime-brand bg-[#F5FCE9]"
                           : selectedCard
                           ? `${slot.accent} border-solid`
-                          : "border-[#E5E0D0] bg-[#FCFBF6] hover:border-slate-300 hover:bg-white"
+                          : "border-cream-border bg-[#FCFBF6] hover:border-slate-300 hover:bg-white"
                       }`}
                     >
                       <div className="mb-2 flex items-center gap-2">
@@ -920,7 +948,7 @@ export default function StudentCerAttemptPage() {
                           className={`flex flex-1 items-center justify-center rounded-xl border border-dashed px-3 py-4 text-center text-xs font-medium transition-colors ${
                             isActive
                               ? "border-lime-500 bg-white text-slate-800"
-                              : "border-[#E5E0D0] bg-white/60 text-slate-400"
+                              : "border-cream-border bg-white/60 text-slate-400"
                           }`}
                         >
                           {isActive
@@ -935,7 +963,7 @@ export default function StudentCerAttemptPage() {
             </div>
 
             {/* Pilihan kartu: 5 kartu tampil horizontal di layar sedang/besar */}
-            <div className="rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm sm:p-5">
+            <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-extrabold sm:text-base">
@@ -981,12 +1009,12 @@ export default function StudentCerAttemptPage() {
                           handleCardClick(card.id);
                         }
                       }}
-                      className={`cer-motion cer-card-enter group relative flex min-h-[160px] flex-col rounded-xl border p-3.5 text-left transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-md cursor-grab active:cursor-grabbing ${
+                      className={`cer-motion cer-card-enter group relative flex min-h-40 flex-col rounded-xl border p-3.5 text-left transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-md cursor-grab active:cursor-grabbing ${
                         isDragging
                           ? "opacity-50 rotate-1 scale-95 border-lime-brand bg-[#F5FCE9] shadow-2xl"
                           : selectedSlot
                           ? "border-lime-brand bg-[#F5FCE9] shadow-sm"
-                          : "border-[#E5E0D0] bg-[#FCFBF6] hover:border-slate-300 hover:bg-white"
+                          : "border-cream-border bg-[#FCFBF6] hover:border-slate-300 hover:bg-white"
                       }`}
                     >
                       <div className="mb-2 flex w-full items-center justify-between gap-1">
@@ -1010,7 +1038,7 @@ export default function StudentCerAttemptPage() {
                         )}
                       </div>
 
-                      <p className="flex-1 whitespace-normal break-words text-xs leading-5 text-slate-700">
+                      <p className="flex-1 whitespace-normal warp-break-word text-xs leading-5 text-slate-700">
                         {card.content}
                       </p>
 
@@ -1030,7 +1058,7 @@ export default function StudentCerAttemptPage() {
                 type="button"
                 onClick={() => handleNavigate(currentIndex - 1)}
                 disabled={currentIndex === 0 || submitting}
-                className="inline-flex items-center gap-2 rounded-xl border border-[#E5E0D0] bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
+                className="inline-flex items-center gap-2 rounded-xl border border-cream-border bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Sebelumnya
@@ -1086,13 +1114,13 @@ export default function StudentCerAttemptPage() {
         id="student-cer-summary-sidebar"
         aria-label="Ringkasan aktivitas"
         aria-hidden={!isSidebarOpen}
-        className={`fixed inset-y-0 right-0 z-50 flex h-dvh w-[min(92vw,390px)] flex-col gap-3 overflow-y-auto border-l border-[#E5E0D0] bg-[#FBF8EE] p-4 shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 right-0 z-50 flex h-dvh w-[min(92vw,390px)] flex-col gap-3 overflow-y-auto border-l border-cream-border bg-cream-light p-4 shadow-2xl transition-transform duration-300 ease-out ${
           isSidebarOpen
             ? "translate-x-0"
             : "translate-x-full pointer-events-none"
         }`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-[#E5E0D0] bg-white px-4 py-3 shadow-sm">
+        <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-cream-border bg-white px-4 py-3 shadow-sm">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[.16em] text-slate-500">
               Reka-CER
@@ -1113,7 +1141,7 @@ export default function StudentCerAttemptPage() {
         </div>
 
         {/* Progres */}
-        <div className="rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-extrabold">Progres</h3>
 
@@ -1125,7 +1153,7 @@ export default function StudentCerAttemptPage() {
             </span>
           </div>
 
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E5E0D0]">
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream-border">
             <div
               className="h-full rounded-full bg-lime-brand transition-[width] duration-500"
               style={{
@@ -1153,7 +1181,7 @@ export default function StudentCerAttemptPage() {
                       ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                       : count === 3
                       ? "border-[#CFE8A7] bg-[#F0F9E3] text-green-800"
-                      : "border-[#E5E0D0] bg-[#FCFBF6] text-slate-600 hover:border-slate-400"
+                      : "border-cream-border bg-[#FCFBF6] text-slate-600 hover:border-slate-400"
                   }`}
                 >
                   {count === 3 && !isCurrent ? (
@@ -1172,7 +1200,7 @@ export default function StudentCerAttemptPage() {
         </div>
 
         {/* Autosave */}
-        <div className="rounded-2xl border border-[#E5E0D0] bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2">
             {saveStatus === "saved" ? (
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -1196,7 +1224,7 @@ export default function StudentCerAttemptPage() {
             <button
               type="button"
               onClick={() => saveNow()}
-              className="mt-3 rounded-lg border border-[#E5E0D0] px-3 py-2 text-xs font-bold transition hover:bg-slate-50"
+              className="mt-3 rounded-lg border border-cream-border px-3 py-2 text-xs font-bold transition hover:bg-slate-50"
             >
               Coba simpan lagi
             </button>
@@ -1239,7 +1267,7 @@ export default function StudentCerAttemptPage() {
             aria-labelledby="material-modal-title"
             className="cer-card-enter flex max-h-[85dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-4 border-b border-[#E5E0D0] bg-[#FCFBF6] px-5 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-4 border-b border-cream-border bg-[#FCFBF6] px-5 py-4 sm:px-6">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
                   <FileText className="h-5 w-5" />
@@ -1275,7 +1303,7 @@ export default function StudentCerAttemptPage() {
               </p>
             </div>
 
-            <div className="flex justify-end border-t border-[#E5E0D0] px-5 py-3 sm:px-6">
+            <div className="flex justify-end border-t border-cream-border px-5 py-3 sm:px-6">
               <button
                 type="button"
                 onClick={() => setShowMaterialModal(false)}
@@ -1322,7 +1350,7 @@ export default function StudentCerAttemptPage() {
                 type="button"
                 onClick={() => setShowSubmitModal(false)}
                 disabled={submitting}
-                className="rounded-xl border border-[#E5E0D0] px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-xl border border-cream-border px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Kembali
               </button>

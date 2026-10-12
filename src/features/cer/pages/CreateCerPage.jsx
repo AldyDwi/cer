@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import { createCerQuiz } from "../services/cerService";
 import { getMaterialOptions } from "../../materials/services/materialService";
@@ -54,6 +55,7 @@ function CreateCerPage() {
       }
 
       navigate(`/teacher/cer/${quiz.id}`);
+      toast.success("Aktivitas CER berhasil dibuat!");
     },
     onError: (err) => {
       const validationErrors = err.response?.data?.errors;
@@ -63,6 +65,9 @@ function CreateCerPage() {
         setError(firstError || "Data aktivitas belum lengkap.");
       } else {
         setError(
+          err.response?.data?.message || "Gagal membuat aktivitas CER."
+        );
+        toast.error(
           err.response?.data?.message || "Gagal membuat aktivitas CER."
         );
       }

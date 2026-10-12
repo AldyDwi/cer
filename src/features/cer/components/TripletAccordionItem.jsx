@@ -7,6 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import TripletFormModal from "./TripletFormModal";
 import { deleteCerItem } from "../services/cerService";
@@ -45,11 +46,15 @@ function TripletAccordionItem({
   const deleteMutation = useMutation({
     mutationFn: () => deleteCerItem(triplet.id),
     onSuccess: () => {
+      toast.success("Triplet berhasil dihapus!");
       onDeleted?.(triplet.id);
       setShowDelete(false);
     },
     onError: (error) => {
       console.error(error);
+      toast.error(
+        error.response?.data?.message || "Gagal menghapus triplet."
+      );
       setDeleteError(
         error.response?.data?.message || "Gagal menghapus triplet."
       );

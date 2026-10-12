@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -17,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../../contexts/AuthContext";
 import api from "../../../services/api";
+import echo from "../../../utils/echo";
 
 export default function StudentProfilePage() {
   const navigate = useNavigate();
@@ -48,6 +48,22 @@ export default function StudentProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [profileError, setProfileError] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    // Tangani update profil dari eksternal (misal diubah oleh Dosen)
+    channel.listen(".activity.updated", () => {
+      checkAuth();
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [checkAuth]);
 
   useEffect(() => {
     setForm({
@@ -171,7 +187,7 @@ export default function StudentProfilePage() {
         {/* Header */}
         <button
           type="button"
-          onClick={() => navigate("/student")}
+          onClick={() => navigate(isStudent ? "/student" : "/teacher")}
           className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-dark"
         >
           <ArrowLeft size={17} />
@@ -200,12 +216,12 @@ export default function StudentProfilePage() {
 
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-lime-50 px-3 py-1.5 text-xs font-semibold text-green-700">
                 <Check size={14} />
-                Mahasiswa
+                {isStudent ? "Mahasiswa" : "Dosen"}
               </span>
             </div>
 
             <h2 className="text-xl font-bold text-dark">
-              {form.name || "Nama mahasiswa"}
+              {form.name || "Nama Pengguna"}
             </h2>
 
             <p className="mt-1 text-sm text-gray-500">

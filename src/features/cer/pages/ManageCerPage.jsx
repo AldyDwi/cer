@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlignLeft,
   BookOpen,
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import TripletFormModal from "../components/TripletFormModal";
 import TripletAccordionItem from "../components/TripletAccordionItem";
@@ -18,6 +19,7 @@ import {
   getCerItems,
   updateCerQuizStatus,
 } from "../services/cerService";
+import echo from "../../../utils/echo";
 
 function ManageCerPage() {
   const { id } = useParams();
@@ -60,17 +62,38 @@ function ManageCerPage() {
   });
 
   /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = echo.channel("cer-activities");
+
+    // Invalidate info aktivitas & item CER jika ada pembaruan
+    channel.listen(".activity.updated", () => {
+      queryClient.invalidateQueries({ queryKey: ["cer-quiz", id] });
+      queryClient.invalidateQueries({ queryKey: ["cer-items", id] });
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [id, queryClient]);
+
+  /* =========================================================
      MUTATION UPDATE STATUS
   ========================================================= */
 
   const statusMutation = useMutation({
     mutationFn: ({ quizId, status }) => updateCerQuizStatus(quizId, status),
     onSuccess: () => {
+      toast.success("Status aktivitas berhasil diperbarui!");
       // Refresh cache info aktivitas setelah status diubah
       queryClient.invalidateQueries({ queryKey: ["cer-quiz", id] });
       setShowStatusModal(false);
     },
     onError: (error) => {
+      toast.error("Gagal mengubah status aktivitas.");
       console.error("Gagal mengubah status aktivitas:", error);
     },
   });

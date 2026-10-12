@@ -2,6 +2,7 @@ import { AlertTriangle, LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import { deleteCerQuiz } from "../services/cerService";
 
@@ -11,10 +12,15 @@ function DeleteCerModal({ activity, onClose, onUpdated }) {
   const deleteMutation = useMutation({
     mutationFn: () => deleteCerQuiz(activity.id),
     onSuccess: async () => {
+      toast.success("Aktivitas CER berhasil dihapus!");
       await onUpdated?.();
       onClose();
     },
     onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal menghapus aktivitas CER."
+      );
+
       setError(
         err.response?.data?.message || "Gagal menghapus aktivitas CER."
       );

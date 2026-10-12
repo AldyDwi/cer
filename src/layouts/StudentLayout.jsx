@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
@@ -8,13 +7,31 @@ import {
   UserRound,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import echo from "../utils/echo";
+import logoImg from "../assets/logo.png";
 
 export default function StudentLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, checkAuth } = useAuth();
   const navigate = useNavigate();
 
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
+
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    // Sinkronkan data autentikasi/profil pengguna jika ada update
+    channel.listen(".activity.updated", () => {
+      checkAuth?.();
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [checkAuth]);
 
   useEffect(() => {
     function handleOutsideClick(event) {
@@ -55,107 +72,109 @@ export default function StudentLayout() {
       <header className="sticky top-0 z-40 border-b border-cream-border bg-white">
         <div className="mx-auto flex h-17 max-w-7xl items-center justify-between px-5 sm:px-7 lg:px-8">
 
-            {/* Kiri: Logo dan Home */}
-            <div className="flex h-full items-center gap-8">
+          {/* Kiri: Logo dan Home */}
+          <div className="flex h-full items-center gap-8">
 
             {/* Logo */}
             <button
-                type="button"
-                onClick={() => navigate("/student")}
-                className="flex shrink-0 items-center gap-3"
+              type="button"
+              onClick={() => navigate("/student")}
+              className="flex shrink-0 items-center gap-3"
             >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-lime-brand text-lg font-extrabold text-dark">
-                R
-                </span>
+              <img
+                src={logoImg}
+                alt="Logo Reka-CER"
+                className="h-11 w-11 shrink-0 rounded-xl object-contain"
+              />
 
-                <span className="text-lg font-bold tracking-tight text-dark">
+              <span className="text-lg font-bold tracking-tight text-dark">
                 Reka-CER
-                </span>
+              </span>
             </button>
 
             {/* Home */}
             <NavLink
-                to="/student"
-                end
-                className={({ isActive }) =>
+              to="/student"
+              end
+              className={({ isActive }) =>
                 `relative flex h-full items-center gap-2 text-sm font-semibold transition ${
-                    isActive
+                  isActive
                     ? "text-dark"
                     : "text-gray-500 hover:text-dark"
                 }`
-                }
+              }
             >
-                {({ isActive }) => (
+              {({ isActive }) => (
                 <>
-                    <House size={17} />
-                    <span>Home</span>
+                  <House size={17} />
+                  <span>Home</span>
 
-                    {isActive && (
+                  {isActive && (
                     <span className="absolute bottom-0 left-0 right-0 h-0.75 rounded-t-full bg-lime-brand" />
-                    )}
+                  )}
                 </>
-                )}
+              )}
             </NavLink>
-            </div>
+          </div>
 
-            {/* Kanan: Profil */}
-            <div className="relative" ref={profileRef}>
+          {/* Kanan: Profil */}
+          <div className="relative" ref={profileRef}>
             <button
-                type="button"
-                onClick={() => setProfileOpen((open) => !open)}
-                aria-label="Menu profil"
-                aria-expanded={profileOpen}
-                className={`flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-cream-light ${
+              type="button"
+              onClick={() => setProfileOpen((open) => !open)}
+              aria-label="Menu profil"
+              aria-expanded={profileOpen}
+              className={`flex items-center gap-2 rounded-xl p-1.5 transition hover:bg-cream-light ${
                 profileOpen ? "bg-cream-light" : ""
-                }`}
+              }`}
             >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-600">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-600">
                 {initial}
-                </span>
+              </span>
 
-                <ChevronDown
+              <ChevronDown
                 size={16}
                 className={`text-gray-500 transition-transform ${
-                    profileOpen ? "rotate-180" : ""
+                  profileOpen ? "rotate-180" : ""
                 }`}
-                />
+              />
             </button>
 
             {profileOpen && (
-                <div className="absolute right-0 top-full mt-3 w-60 overflow-hidden rounded-2xl border border-cream-border bg-white p-2 shadow-lg">
+              <div className="absolute right-0 top-full mt-3 w-60 overflow-hidden rounded-2xl border border-cream-border bg-white p-2 shadow-lg">
                 <div className="border-b border-cream-border px-3 py-3">
-                    <p className="truncate text-sm font-semibold text-dark">
+                  <p className="truncate text-sm font-semibold text-dark">
                     {profileName}
-                    </p>
+                  </p>
 
-                    <p className="mt-1 truncate text-xs text-gray-500">
+                  <p className="mt-1 truncate text-xs text-gray-500">
                     {user?.email || user?.username || "Mahasiswa"}
-                    </p>
+                  </p>
                 </div>
 
                 <button
-                    type="button"
-                    onClick={() => {
+                  type="button"
+                  onClick={() => {
                     setProfileOpen(false);
                     navigate("/student/profile");
-                    }}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-gray-600 transition hover:bg-cream-light hover:text-dark"
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-gray-600 transition hover:bg-cream-light hover:text-dark"
                 >
-                    <UserRound size={17} />
-                    Profil
+                  <UserRound size={17} />
+                  Profil
                 </button>
 
                 <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 transition hover:bg-red-50"
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-red-500 transition hover:bg-red-50"
                 >
-                    <LogOut size={17} />
-                    Keluar
+                  <LogOut size={17} />
+                  Keluar
                 </button>
-                </div>
+              </div>
             )}
-            </div>
+          </div>
 
         </div>
       </header>

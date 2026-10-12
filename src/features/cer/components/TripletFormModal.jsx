@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, Plus, Sparkles, X } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import {
   createCerItem,
@@ -93,12 +94,18 @@ function TripletFormModal({
     onSuccess: (response) => {
       const data = response?.data ?? response;
       if (isEdit) {
+        toast.success("Triplet berhasil diperbarui!");
         onUpdated?.(data);
       } else {
+        toast.success("Triplet berhasil ditambahkan!");
         onAdded?.(data);
       }
     },
     onError: (err) => {
+      toast.error(
+        err.response?.data?.message ||
+          `Gagal ${isEdit ? "memperbarui" : "menambahkan"} triplet.`
+      );
       setError(
         err.response?.data?.message ||
           `Gagal ${isEdit ? "memperbarui" : "menambahkan"} triplet.`

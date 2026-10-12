@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { Outlet, useLocation } from "react-router-dom";
 
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
 import TeacherSidebar from "./components/TeacherSidebar";
 import { CerActivityProvider } from "../contexts/CerActivityContext";
 
@@ -109,6 +112,19 @@ function TeacherLayout() {
         >
           <div className="p-6 lg:p-8">
             <Outlet />
+
+            <ToastContainer
+              position="top-right"
+              autoClose={5000}
+              hideProgressBar={false}
+              newestOnTop
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
           </div>
         </main>
       </div>

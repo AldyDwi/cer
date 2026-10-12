@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Plus,
   Eye,
@@ -11,6 +11,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "react-toastify";
 
 import {
   getMaterials,
@@ -22,6 +23,7 @@ import {
 import MaterialFormModal from "../components/MaterialFormModal";
 import MaterialDetailModal from "../components/MaterialDetailModal";
 import DeleteMaterialModal from "../components/DeleteMaterialModal";
+import echo from "../../../utils/echo";
 
 function MaterialsPage() {
   const queryClient = useQueryClient();
@@ -55,6 +57,22 @@ function MaterialsPage() {
     staleTime: 1000 * 60 * 5, // Cache selama 5 menit
   });
 
+  /* =========================================================
+     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    // Invalidate daftar materi jika ada pembaruan dari backend/broadcast Reverb
+    channel.listen(".activity.updated", () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [queryClient]);
+
   const materials = materialsData?.data || [];
   const pagination = {
     currentPage: materialsData?.current_page || 1,
@@ -73,31 +91,49 @@ function MaterialsPage() {
   const createMutation = useMutation({
     mutationFn: createMaterial,
     onSuccess: () => {
+      toast.success("Materi baru berhasil ditambahkan!");
       queryClient.invalidateQueries({ queryKey: ["materials"] });
       setCurrentPage(1);
       setSearch("");
       setSearchInput("");
       closeModal();
     },
+    onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal menambahkan materi baru."
+      );
+    },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => updateMaterial(id, data),
     onSuccess: () => {
+      toast.success("Materi berhasil diperbarui!");
       queryClient.invalidateQueries({ queryKey: ["materials"] });
       closeModal();
+    },
+    onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal memperbarui materi."
+      );
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => deleteMaterial(id),
     onSuccess: () => {
+      toast.success("Materi berhasil dihapus!");
       queryClient.invalidateQueries({ queryKey: ["materials"] });
       // Jika data terakhir di halaman terhapus, kembali ke halaman sebelumnya
       if (materials.length === 1 && currentPage > 1) {
         setCurrentPage((page) => page - 1);
       }
       closeModal();
+    },
+    onError: (err) => {
+      toast.error(
+        err.response?.data?.message || "Gagal menghapus materi."
+      );
     },
   });
 

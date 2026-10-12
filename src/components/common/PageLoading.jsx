@@ -1,13 +1,16 @@
 import { LoaderCircle } from "lucide-react";
+import logoImg from "../../assets/logo.png";
 
 function PageLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream-light">
       <div className="flex flex-col items-center">
         {/* Logo */}
-        <div className="flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-lime-brand text-xl font-bold text-dark shadow-sm">
-          R
-        </div>
+        <img
+          src={logoImg}
+          alt="Reka-CER Logo"
+          className="h-14 w-14 animate-pulse object-contain rounded-2xl"
+        />
 
         {/* Loading indicator */}
         <div className="mt-5 flex items-center gap-2">

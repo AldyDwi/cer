@@ -17,9 +17,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../contexts/AuthContext";
 import { useCerActivities } from "../../contexts/CerActivityContext";
 
+import logoImg from "../../assets/logo.png";
+import logoCompactImg from "../../assets/logo 2.png";
+
 import CerActivityMenu from "../../features/cer/components/CerActivityMenu";
 import EditCerModal from "../../features/cer/components/EditCerModal";
 import DeleteCerModal from "../../features/cer/components/DeleteCerModal";
+import echo from "../../utils/echo";
 
 function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
   const { user, logout } = useAuth();
@@ -39,6 +43,36 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
     loading: activitiesLoading,
     refreshActivities,
   } = useCerActivities();
+
+  /*
+    =========================================================
+    WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+  ========================================================= */
+  useEffect(() => {
+    const channel = echo.channel("cer-activities");
+
+    // Tangani pembaruan aktivitas CER real-time
+    channel.listen(".activity.updated", (data) => {
+      // Invalidate query tanpa memicu indikator loading penuh
+      queryClient.invalidateQueries({ 
+        queryKey: ["cer-quizzes"],
+        refetchType: "active", // Hanya refetch jika query sedang aktif
+      });
+
+      queryClient.invalidateQueries({ 
+        queryKey: ["student-published-activities"] 
+      });
+
+      // Jalankan refresh background hanya jika data benar-benar merupakan pembaruan aktivitas CER
+      if (data?.activity_id || data?.type === "cer_activity") {
+        refreshActivities?.();
+      }
+    });
+
+    return () => {
+      echo.leaveChannel("cer-activities");
+    };
+  }, [queryClient, refreshActivities]);
 
   /*
    * Delay 150ms hanya ketika: compact -> expanded
@@ -145,9 +179,11 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
           <>
             {/* Logo + Website Name */}
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lime-brand text-lg font-bold text-dark">
-                R
-              </div>
+              <img
+                src={logoImg}
+                alt="Logo Reka-CER"
+                className="h-11 w-11 shrink-0 rounded-xl object-contain"
+              />
 
               {showExpandedContent && (
                 <div className="min-w-0">
@@ -178,11 +214,13 @@ function TeacherSidebar({ isOpen, isMobile, onOpen, onClose }) {
             type="button"
             onClick={onOpen}
             aria-label="Buka sidebar"
-            className="group relative flex h-10 w-10 items-center justify-center rounded-xl bg-dark text-lime-brand transition hover:bg-dark/90"
+            className="group relative flex h-11 w-11 items-center justify-center rounded-xl bg-dark text-lime-brand transition hover:bg-dark/90"
           >
-            <span className="text-lg font-bold transition group-hover:scale-0">
-              R
-            </span>
+            <img
+              src={logoCompactImg}
+              alt="Logo Reka-CER"
+              className="h-5.5 w-5.5 object-contain transition group-hover:scale-0"
+            />
 
             <PanelLeftOpen
               size={19}
