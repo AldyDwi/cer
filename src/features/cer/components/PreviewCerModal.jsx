@@ -129,7 +129,7 @@ export default function PreviewCerModal({ activity, triplets = [], onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 sm:p-6">
       <div className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-cream-border bg-cream-light shadow-2xl">
         {/* Header Modal Preview */}
         <div className="flex shrink-0 items-center justify-between border-b border-cream-border bg-white px-5 py-4">

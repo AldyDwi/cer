@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Clock3,
   Award,
+  Eye,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -64,7 +65,7 @@ function GradeRecapPage() {
   });
 
   /* =========================================================
-     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+      WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
   ========================================================= */
   useEffect(() => {
     if (!id) return;
@@ -73,13 +74,13 @@ function GradeRecapPage() {
 
     // Invalidate query rekap nilai saat mahasiswa mengirimkan pengerjaan
     channel.listen(".attempt.submitted", () => {
-      queryClient.invalidateQueries({ queryKey: ["cer-grades", id], refetchType: "all", });
+      queryClient.invalidateQueries({ queryKey: ["cer-grades", id], refetchType: "all" });
     });
 
     // Invalidate query detail aktivitas & rekap nilai jika ada pembaruan aktivitas
     channel.listen(".activity.updated", () => {
-      queryClient.invalidateQueries({ queryKey: ["cer-quiz", id], refetchType: "all", });
-      queryClient.invalidateQueries({ queryKey: ["cer-grades", id], refetchType: "all", });
+      queryClient.invalidateQueries({ queryKey: ["cer-quiz", id], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["cer-grades", id], refetchType: "all" });
     });
 
     return () => {
@@ -98,7 +99,7 @@ function GradeRecapPage() {
     "";
 
   /* =========================================================
-     AVERAGE SCORE CALCULATION
+      AVERAGE SCORE CALCULATION
   ========================================================= */
   const filteredStudents = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -126,7 +127,6 @@ function GradeRecapPage() {
     const total = validScores.reduce((sum, current) => sum + current, 0);
     const avg = total / validScores.length;
 
-    // Jika desimal bulat, tampilkan tanpa desimal, jika tidak tampilkan max 1 desimal
     return Number.isInteger(avg) ? avg : avg.toFixed(1);
   }, [filteredStudents]);
 
@@ -206,7 +206,6 @@ function GradeRecapPage() {
                     Materi: {activity.material?.title ?? "-"}
                   </p>
 
-                  {/* Status dipindah ke bawah tulisan materi */}
                   <div className="mt-2">
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -222,7 +221,6 @@ function GradeRecapPage() {
                   </div>
                 </div>
 
-                {/* Posisi status sebelumnya diganti menjadi Rata-rata Nilai */}
                 <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-cream-border bg-dark px-4 py-3 sm:self-center">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
                     <Award size={20} />
@@ -340,6 +338,9 @@ function GradeRecapPage() {
                 <th className="px-5 py-4 text-left text-sm font-semibold text-gray-600">
                   Status
                 </th>
+                <th className="px-5 py-4 text-center text-sm font-semibold text-gray-600">
+                  Aksi
+                </th>
               </tr>
             </thead>
 
@@ -351,13 +352,15 @@ function GradeRecapPage() {
                   <GradeRow
                     key={student.id}
                     student={student}
+                    quizId={id}
                     index={(page - 1) * perPage + index + 1}
                     colorIndex={index}
+                    navigate={navigate}
                   />
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
+                  <td colSpan={9} className="px-5 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
                         <ClipboardList
@@ -401,7 +404,7 @@ function GradeRecapPage() {
   );
 }
 
-function GradeRow({ student, index, colorIndex }) {
+function GradeRow({ student, quizId, index, colorIndex, navigate }) {
   const initials =
     student.name
       ?.split(" ")
@@ -409,6 +412,8 @@ function GradeRow({ student, index, colorIndex }) {
       .map((word) => word[0])
       .join("")
       .toUpperCase() || "?";
+
+  const targetStudentId = student.student_id ?? student.id;
 
   return (
     <tr className="border-b border-cream-border last:border-b-0 transition hover:bg-cream-light/40">
@@ -468,6 +473,24 @@ function GradeRow({ student, index, colorIndex }) {
           </span>
         )}
       </td>
+      <td className="px-5 py-4 text-center">
+        {student.status === "completed" ? (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                `/teacher/cer/${quizId}/review?student_id=${targetStudentId}`
+              )
+            }
+            className="inline-flex items-center gap-1.5 rounded-xl border border-cream-border bg-[#F5FCE9] px-3 py-1.5 text-xs font-bold text-dark transition hover:border-lime-brand hover:bg-[#EAF8D3]"
+          >
+            <Eye size={14} className="text-[#5C8C00]" />
+            Detail
+          </button>
+        ) : (
+          <span className="text-xs text-gray-400">-</span>
+        )}
+      </td>
     </tr>
   );
 }
@@ -524,6 +547,9 @@ function TableSkeleton() {
           </td>
           <td className="px-5 py-5">
             <div className="h-6 w-20 animate-pulse rounded-full bg-gray-100" />
+          </td>
+          <td className="px-5 py-5">
+            <div className="mx-auto h-6 w-16 animate-pulse rounded-xl bg-gray-100" />
           </td>
         </tr>
       ))}

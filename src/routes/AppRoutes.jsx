@@ -79,6 +79,11 @@ function AppRoutes() {
           path="/teacher/cer/:id/grades"
           element={<GradeRecapPage />}
         />
+
+        <Route
+          path="/teacher/cer/:id/review"
+          element={<StudentCerReviewPage />}
+        />
       </Route>
 
       {/* =========================================
@@ -103,12 +108,12 @@ function AppRoutes() {
           path="/student/cer/:id/attempt"
           element={<StudentCerAttemptPage />}
         />
-      </Route>
 
-      <Route
-        path="/student/cer/:id/review"
-        element={<StudentCerReviewPage />}
-      />
+        <Route
+          path="/student/cer/:id/review"
+          element={<StudentCerReviewPage />}
+        />
+      </Route>
     </Routes>
   );
 }

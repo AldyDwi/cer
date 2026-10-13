@@ -187,11 +187,11 @@ export default function StudentProfilePage() {
         {/* Header */}
         <button
           type="button"
-          onClick={() => navigate(isStudent ? "/student" : "/teacher")}
+          onClick={() => navigate(isStudent ? "/student" : "/teacher/cer/create")}
           className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-dark"
         >
           <ArrowLeft size={17} />
-          Kembali ke Home
+          Kembali
         </button>
 
         <div className="mb-8">

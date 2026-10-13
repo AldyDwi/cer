@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import api from "../../../services/api";
 import echo from "../../../utils/echo";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const CER_SLOTS = [
   {
@@ -146,6 +147,9 @@ function ResultBadge({ correct, answered }) {
 }
 
 function AnswerReview({ item, slot, showCorrectAnswers = true }) {
+  const { user } = useAuth();
+  const isTeacher = user?.role === "teacher";
+
   const answer = item.answer;
 
   const selectedCard = getSelectedCard(
@@ -196,7 +200,7 @@ function AnswerReview({ item, slot, showCorrectAnswers = true }) {
         }`}
       >
         <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          Jawaban kamu
+          {isTeacher ? "Jawaban mahasiswa" : "Jawaban kamu"}
         </p>
 
         <div className="flex items-start gap-2">
@@ -209,12 +213,12 @@ function AnswerReview({ item, slot, showCorrectAnswers = true }) {
           )}
 
           <p className="whitespace-pre-line wrap-break-word text-sm leading-6 text-slate-700">
-            {selectedCard?.content ?? "Kamu belum memilih kartu."}
+            {selectedCard?.content ?? (isTeacher ? "Belum memilih kartu." : "Kamu belum memilih kartu.")}
           </p>
         </div>
       </div>
 
-      {/* Kunci jawaban (Hanya dikontrol oleh properti show_keys) */}
+      {/* Kunci jawaban */}
       {!isCorrect && showCorrectAnswers && (
         <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-3">
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-green-800">
@@ -318,11 +322,12 @@ function TripletReview({ item, index, showCorrectAnswers }) {
 
 export default function StudentCerReviewPage() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   /* =========================================================
-     REACT QUERY DATA FETCHING
+      REACT QUERY DATA FETCHING
   ========================================================= */
   const {
     data: reviewData,
@@ -331,9 +336,12 @@ export default function StudentCerReviewPage() {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ["student-cer-review", id],
+    queryKey: ["student-cer-review", id, location.search],
     queryFn: async () => {
-      const response = await api.get(`/student/cer-quizzes/${id}/review`);
+      // Menyertakan query parameter ?student_id=... jika ada dari URL
+      const response = await api.get(
+        `/student/cer-quizzes/${id}/review${location.search}`
+      );
       return response.data;
     },
     enabled: Boolean(id),
@@ -341,7 +349,7 @@ export default function StudentCerReviewPage() {
   });
 
   /* =========================================================
-     WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
+      WEBSOCKET REAL-TIME LISTENER (LARAVEL REVERB)
   ========================================================= */
   useEffect(() => {
     const channel = echo.channel("cer-activities");
@@ -349,7 +357,7 @@ export default function StudentCerReviewPage() {
     channel.listen(".activity.updated", (event) => {
       if (Number(event?.activity_id ?? event?.id) === Number(id)) {
         queryClient.invalidateQueries({
-          queryKey: ["student-cer-review", id],
+          queryKey: ["student-cer-review", id, location.search],
         });
       }
     });
@@ -357,7 +365,15 @@ export default function StudentCerReviewPage() {
     return () => {
       echo.leaveChannel("cer-activities");
     };
-  }, [id, queryClient]);
+  }, [id, location.search, queryClient]);
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/student");
+    }
+  };
 
   const quiz = reviewData?.quiz ?? null;
   const attempt = reviewData?.attempt ?? null;
@@ -423,11 +439,11 @@ export default function StudentCerReviewPage() {
 
             <button
               type="button"
-              onClick={() => navigate("/student")}
+              onClick={handleBack}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700"
             >
               <ArrowLeft className="h-4 w-4" />
-              Kembali ke daftar aktivitas
+              Kembali
             </button>
           </div>
         </section>
@@ -438,7 +454,7 @@ export default function StudentCerReviewPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-cream-light text-slate-900">
       {/* Header */}
-      <header className="border-b border-cream-border bg-white">
+      <header className={`bg-white {isTeacher ? "rounded-2xl border border-cream-border shadow-sm" : "border-b border-cream-border"}`}>
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-500">
@@ -452,14 +468,11 @@ export default function StudentCerReviewPage() {
 
           <button
             type="button"
-            onClick={() => navigate("/student")}
+            onClick={handleBack}
             className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cream-border bg-[#FCFBF6] px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-lime-brand hover:bg-[#F5FCE9] sm:px-4 sm:text-sm"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">
-              Daftar aktivitas
-            </span>
-            <span className="sm:hidden">Kembali</span>
+            <span>Kembali</span>
           </button>
         </div>
 
@@ -494,7 +507,7 @@ export default function StudentCerReviewPage() {
 
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600">
                 Berikut hasil rekonstruksi Claim, Evidence, dan Reasoning
-                yang telah kamu kerjakan. Tinjau setiap komponen untuk
+                yang telah dikerjakan. Tinjau setiap komponen untuk
                 mengetahui jawaban yang benar dan bagian yang perlu
                 dipelajari kembali.
               </p>
@@ -601,7 +614,7 @@ export default function StudentCerReviewPage() {
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Buka setiap triplet untuk meninjau jawabanmu{showCorrectAnswers ? " dan membandingkannya dengan kunci jawaban." : "."}
+              Buka setiap triplet untuk meninjau jawaban{showCorrectAnswers ? " dan membandingkannya dengan kunci jawaban." : "."}
             </p>
           </div>
 
@@ -629,22 +642,21 @@ export default function StudentCerReviewPage() {
         <footer className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-cream-border bg-white p-5 sm:flex-row">
           <div>
             <h3 className="text-sm font-extrabold">
-              Sudah meninjau hasilmu?
+              Sudah selesai meninjau hasil?
             </h3>
 
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Kamu bisa kembali ke daftar aktivitas untuk melihat
-              aktivitas lainnya.
+              Klik tombol kembali untuk kembali ke halaman sebelumnya.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => navigate("/student")}
+            onClick={handleBack}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-lime-brand px-5 py-3 text-sm font-extrabold text-slate-900 transition hover:-translate-y-0.5 hover:bg-lime-hover sm:w-auto"
           >
             <ArrowLeft className="h-4 w-4" />
-            Kembali ke daftar aktivitas
+            Kembali
           </button>
         </footer>
       </div>
