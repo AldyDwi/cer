@@ -678,11 +678,11 @@ const shuffledCards = useMemo(() => {
       setSaveStatus("saved");
 
       if (automatic) {
-        navigate("/student", { replace: true });
+        navigate(`/student/cer/${id}/review`, { replace: true });
         return;
       }
 
-      navigate("/student", {
+      navigate(`/student/cer/${id}/review`, {
         replace: true,
       });
 
@@ -993,8 +993,6 @@ const shuffledCards = useMemo(() => {
                           key={selectedCard.id}
                           className="cer-card-enter flex flex-1 items-start gap-2.5 rounded-xl border border-white/80 bg-white p-3 shadow-sm"
                         >
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-
                           <p className="flex-1 text-xs leading-5 text-slate-700">
                             {selectedCard.content}
                           </p>
@@ -1040,10 +1038,6 @@ const shuffledCards = useMemo(() => {
                     Tarik kartu ke slot CER atau klik kartu untuk memilihnya.
                   </p>
                 </div>
-
-                <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                  {shuffledCards.length} kartu
-                </span>
               </div>
 
               {/* Grid 5 Kolom Horizontal */}
@@ -1264,38 +1258,6 @@ const shuffledCards = useMemo(() => {
           <p className="mt-3 text-[11px] leading-5 text-slate-500">
             Hijau berarti semua slot terisi, bukan berarti jawaban benar.
           </p>
-        </div>
-
-        {/* Autosave */}
-        <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2">
-            {saveStatus === "saved" ? (
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            ) : saveStatus === "saving" ? (
-              <LoaderCircle className="h-4 w-4 animate-spin text-blue-600" />
-            ) : saveStatus === "expired" ? (
-              <ShieldAlert className="h-4 w-4 text-red-600" />
-            ) : (
-              <Save className="h-4 w-4 text-amber-600" />
-            )}
-
-            <h3 className="text-sm font-extrabold">Autosave</h3>
-          </div>
-
-          <p className="mt-2 text-xs text-slate-600">
-            {getSaveLabel(saveStatus)}
-            {saveStatus === "unsaved" && " — perubahan menunggu disimpan."}
-          </p>
-
-          {saveStatus === "error" && (
-            <button
-              type="button"
-              onClick={() => saveNow()}
-              className="mt-3 rounded-lg border border-cream-border px-3 py-2 text-xs font-bold transition hover:bg-slate-50"
-            >
-              Coba simpan lagi
-            </button>
-          )}
         </div>
 
         {errorMessage && (

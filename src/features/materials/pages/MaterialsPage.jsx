@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Eye,
@@ -28,8 +28,8 @@ import echo from "../../../utils/echo";
 function MaterialsPage() {
   const queryClient = useQueryClient();
 
+  // State untuk pencarian instan
   const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
 
   const [perPage, setPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -38,23 +38,18 @@ function MaterialsPage() {
   const [selectedMaterial, setSelectedMaterial] = useState(null);
 
   /* =========================================================
-     REACT QUERY DATA FETCHING
+     REACT QUERY DATA FETCHING (Mengambil data tanpa parameter search)
   ========================================================= */
 
   const {
-    data: materialsData,
+    data: materialsResponse,
     isLoading: loading,
     isError,
     error: queryError,
   } = useQuery({
-    queryKey: ["materials", search, perPage, currentPage],
-    queryFn: () =>
-      getMaterials({
-        search,
-        perPage,
-        page: currentPage,
-      }),
-    staleTime: 1000 * 60 * 5, // Cache selama 5 menit
+    queryKey: ["materials"],
+    queryFn: () => getMaterials({ perPage: 1000 }),
+    staleTime: 1000 * 60 * 5,
   });
 
   /* =========================================================
@@ -63,7 +58,6 @@ function MaterialsPage() {
   useEffect(() => {
     const channel = echo.channel("cer-activities");
 
-    // Invalidate daftar materi jika ada pembaruan dari backend/broadcast Reverb
     channel.listen(".activity.updated", () => {
       queryClient.invalidateQueries({ queryKey: ["materials"] });
     });
@@ -73,12 +67,50 @@ function MaterialsPage() {
     };
   }, [queryClient]);
 
-  const materials = materialsData?.data || [];
-  const pagination = {
-    currentPage: materialsData?.current_page || 1,
-    lastPage: materialsData?.last_page || 1,
-    total: materialsData?.total || 0,
-  };
+  // Ekstraksi data mentah dari API
+  const allMaterials = useMemo(() => {
+    if (!materialsResponse) return [];
+    if (Array.isArray(materialsResponse)) return materialsResponse;
+    return materialsResponse.data || [];
+  }, [materialsResponse]);
+
+  /* =========================================================
+     CLIENT-SIDE INSTANT SEARCH
+  ========================================================= */
+  const filteredMaterials = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    if (!keyword) return allMaterials;
+
+    return allMaterials.filter((material) => {
+      const titleMatches = material.title?.toLowerCase().includes(keyword);
+      const contentMatches = material.content?.toLowerCase().includes(keyword);
+
+      return titleMatches || contentMatches;
+    });
+  }, [allMaterials, search]);
+
+  /* =========================================================
+     CLIENT-SIDE PAGINATION
+  ========================================================= */
+  const lastPage = Math.max(1, Math.ceil(filteredMaterials.length / perPage));
+
+  const paginatedMaterials = useMemo(() => {
+    const start = (currentPage - 1) * perPage;
+    return filteredMaterials.slice(start, start + perPage);
+  }, [filteredMaterials, currentPage, perPage]);
+
+  // Reset halaman ke-1 saat kata kunci search atau perPage berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, perPage]);
+
+  // Menjaga agar currentPage tidak melebihi lastPage
+  useEffect(() => {
+    if (currentPage > lastPage) {
+      setCurrentPage(lastPage);
+    }
+  }, [currentPage, lastPage]);
 
   const error =
     isError &&
@@ -95,7 +127,6 @@ function MaterialsPage() {
       queryClient.invalidateQueries({ queryKey: ["materials"] });
       setCurrentPage(1);
       setSearch("");
-      setSearchInput("");
       closeModal();
     },
     onError: (err) => {
@@ -124,10 +155,6 @@ function MaterialsPage() {
     onSuccess: () => {
       toast.success("Materi berhasil dihapus!");
       queryClient.invalidateQueries({ queryKey: ["materials"] });
-      // Jika data terakhir di halaman terhapus, kembali ke halaman sebelumnya
-      if (materials.length === 1 && currentPage > 1) {
-        setCurrentPage((page) => page - 1);
-      }
       closeModal();
     },
     onError: (err) => {
@@ -141,19 +168,12 @@ function MaterialsPage() {
      HANDLERS
   ========================================================= */
 
-  function handleSearchSubmit(event) {
-    event.preventDefault();
-    setCurrentPage(1);
-    setSearch(searchInput.trim());
-  }
-
   function handlePerPageChange(event) {
     setPerPage(Number(event.target.value));
-    setCurrentPage(1);
   }
 
   function handlePageChange(page) {
-    if (page < 1 || page > pagination.lastPage) {
+    if (page < 1 || page > lastPage) {
       return;
     }
     setCurrentPage(page);
@@ -201,9 +221,7 @@ function MaterialsPage() {
 
   return (
     <div className="space-y-6">
-      {/* =========================================
-          HEADER
-      ========================================== */}
+      {/* HEADER */}
       <div>
         <h1 className="text-2xl font-bold text-dark">Kelola Materi</h1>
 
@@ -212,9 +230,7 @@ function MaterialsPage() {
         </p>
       </div>
 
-      {/* =========================================
-          ADD BUTTON
-      ========================================== */}
+      {/* ADD BUTTON */}
       <button
         type="button"
         onClick={openCreate}
@@ -224,9 +240,7 @@ function MaterialsPage() {
         Tambah Materi
       </button>
 
-      {/* =========================================
-          TOOLBAR
-      ========================================== */}
+      {/* TOOLBAR */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Per Page */}
         <div className="flex items-center gap-2">
@@ -253,44 +267,38 @@ function MaterialsPage() {
           <span className="text-sm text-gray-500">data</span>
         </div>
 
-        {/* Search */}
-        <form onSubmit={handleSearchSubmit} className="flex w-full sm:w-auto">
-          <div className="relative w-full sm:w-72">
-            <Search
-              size={18}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
+        {/* Instant Search Input */}
+        <div className="relative w-full sm:w-72">
+          <Search
+            size={18}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
 
-            <input
-              type="text"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Cari materi..."
-              className="w-full rounded-xl border border-cream-border bg-white py-2.5 pl-10 pr-4 text-sm text-dark outline-none transition placeholder:text-gray-400 focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
-            />
-          </div>
-        </form>
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Cari materi..."
+            className="w-full rounded-xl border border-cream-border bg-white py-2.5 pl-10 pr-4 text-sm text-dark outline-none transition placeholder:text-gray-400 focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
+          />
+        </div>
       </div>
 
-      {/* =========================================
-          ERROR
-      ========================================== */}
+      {/* ERROR */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
-      {/* =========================================
-          MATERIAL GRID
-      ========================================== */}
+      {/* MATERIAL GRID */}
       {loading ? (
         <MaterialLoading />
-      ) : materials.length === 0 ? (
+      ) : paginatedMaterials.length === 0 ? (
         <EmptyMaterials search={search} onCreate={openCreate} />
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {materials.map((material, index) => (
+          {paginatedMaterials.map((material, index) => (
             <MaterialCard
               key={material.id}
               material={material}
@@ -303,21 +311,17 @@ function MaterialsPage() {
         </div>
       )}
 
-      {/* =========================================
-          PAGINATION
-      ========================================== */}
-      {!loading && materials.length > 0 && (
+      {/* PAGINATION */}
+      {!loading && filteredMaterials.length > 0 && (
         <Pagination
-          currentPage={pagination.currentPage}
-          lastPage={pagination.lastPage}
-          total={pagination.total}
+          currentPage={currentPage}
+          lastPage={lastPage}
+          total={filteredMaterials.length}
           onPageChange={handlePageChange}
         />
       )}
 
-      {/* =========================================
-          CREATE MODAL
-      ========================================== */}
+      {/* CREATE MODAL */}
       {modal === "create" && (
         <MaterialFormModal
           mode="create"
@@ -326,9 +330,7 @@ function MaterialsPage() {
         />
       )}
 
-      {/* =========================================
-          EDIT MODAL
-      ========================================== */}
+      {/* EDIT MODAL */}
       {modal === "edit" && selectedMaterial && (
         <MaterialFormModal
           mode="edit"
@@ -338,9 +340,7 @@ function MaterialsPage() {
         />
       )}
 
-      {/* =========================================
-          DETAIL MODAL
-      ========================================== */}
+      {/* DETAIL MODAL */}
       {modal === "detail" && selectedMaterial && (
         <MaterialDetailModal
           material={selectedMaterial}
@@ -348,9 +348,7 @@ function MaterialsPage() {
         />
       )}
 
-      {/* =========================================
-          DELETE MODAL
-      ========================================== */}
+      {/* DELETE MODAL */}
       {modal === "delete" && selectedMaterial && (
         <DeleteMaterialModal
           material={selectedMaterial}
@@ -482,7 +480,7 @@ function CardActionButton({ icon, label, danger = false, onClick }) {
 function MaterialLoading() {
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-      {[1, 2, 3].map((item) => (
+      {[1, 2, 3, 4, 5, 6].map((item) => (
         <div
           key={item}
           className="h-75 animate-pulse rounded-3xl border border-cream-border bg-white p-5"

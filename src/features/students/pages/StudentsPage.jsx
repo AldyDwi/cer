@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Pencil,
@@ -26,9 +26,8 @@ import echo from "../../../utils/echo";
 function StudentsPage() {
   const queryClient = useQueryClient();
 
-  const [searchInput, setSearchInput] = useState("");
+  // State untuk pencarian instan & filter
   const [search, setSearch] = useState("");
-
   const [className, setClassName] = useState("");
 
   const [perPage, setPerPage] = useState(10);
@@ -38,23 +37,17 @@ function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   /* =========================================================
-     REACT QUERY DATA FETCHING
+     REACT QUERY DATA FETCHING (Mengambil data tanpa parameter search/page)
   ========================================================= */
 
   const {
-    data: studentsData,
+    data: studentsResponse,
     isLoading: loading,
     isError,
     error: queryError,
   } = useQuery({
-    queryKey: ["students", search, className, perPage, currentPage],
-    queryFn: () =>
-      getStudents({
-        search,
-        className,
-        perPage,
-        page: currentPage,
-      }),
+    queryKey: ["students"],
+    queryFn: () => getStudents({ perPage: 1000 }), // Ambil seluruh/sebagian besar data untuk diolah di client-side
     staleTime: 1000 * 60 * 5, // Cache data selama 5 menit
   });
 
@@ -64,7 +57,6 @@ function StudentsPage() {
   useEffect(() => {
     const channel = echo.channel("cer-activities");
 
-    // Invalidate daftar mahasiswa jika ada pembaruan data student / profil
     channel.listen(".activity.updated", () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
     });
@@ -74,14 +66,64 @@ function StudentsPage() {
     };
   }, [queryClient]);
 
-  const students = studentsData?.data || [];
-  const classes = studentsData?.classes || [];
+  // Ekstraksi data mentah dari API
+  const allStudents = useMemo(() => {
+    if (!studentsResponse) return [];
+    if (Array.isArray(studentsResponse)) return studentsResponse;
+    return studentsResponse.data || [];
+  }, [studentsResponse]);
 
-  const pagination = {
-    currentPage: studentsData?.current_page || 1,
-    lastPage: studentsData?.last_page || 1,
-    total: studentsData?.total || 0,
-  };
+  // Ekstraksi daftar kelas unik untuk dropdown filter
+  const classes = useMemo(() => {
+    if (studentsResponse?.classes && Array.isArray(studentsResponse.classes)) {
+      return studentsResponse.classes;
+    }
+    const uniqueClasses = [
+      ...new Set(allStudents.map((s) => s.class_name).filter(Boolean)),
+    ];
+    return uniqueClasses.sort();
+  }, [studentsResponse, allStudents]);
+
+  /* =========================================================
+     CLIENT-SIDE FILTER & INSTANT SEARCH
+  ========================================================= */
+  const filteredStudents = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    return allStudents.filter((student) => {
+      const matchesSearch =
+        !keyword ||
+        student.name?.toLowerCase().includes(keyword) ||
+        student.username?.toLowerCase().includes(keyword) ||
+        student.email?.toLowerCase().includes(keyword);
+
+      const matchesClass = !className || student.class_name === className;
+
+      return matchesSearch && matchesClass;
+    });
+  }, [allStudents, search, className]);
+
+  /* =========================================================
+     CLIENT-SIDE PAGINATION
+  ========================================================= */
+  const lastPage = Math.max(1, Math.ceil(filteredStudents.length / perPage));
+
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * perPage;
+    return filteredStudents.slice(start, start + perPage);
+  }, [filteredStudents, currentPage, perPage]);
+
+  // Reset halaman ke-1 saat kata kunci search, filter kelas, atau perPage berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, className, perPage]);
+
+  // Menjaga agar currentPage tidak melebihi lastPage
+  useEffect(() => {
+    if (currentPage > lastPage) {
+      setCurrentPage(lastPage);
+    }
+  }, [currentPage, lastPage]);
 
   const error =
     isError &&
@@ -126,9 +168,6 @@ function StudentsPage() {
     onSuccess: () => {
       toast.success("Mahasiswa berhasil dihapus!");
       queryClient.invalidateQueries({ queryKey: ["students"] });
-      if (students.length === 1 && currentPage > 1) {
-        setCurrentPage((page) => page - 1);
-      }
       closeModal();
     },
     onError: (err) => {
@@ -142,24 +181,16 @@ function StudentsPage() {
      HANDLERS
   ========================================================= */
 
-  function handleSearchSubmit(event) {
-    event.preventDefault();
-    setCurrentPage(1);
-    setSearch(searchInput.trim());
-  }
-
   function handleClassChange(event) {
     setClassName(event.target.value);
-    setCurrentPage(1);
   }
 
   function handlePerPageChange(event) {
     setPerPage(Number(event.target.value));
-    setCurrentPage(1);
   }
 
   function handlePageChange(page) {
-    if (page < 1 || page > pagination.lastPage) {
+    if (page < 1 || page > lastPage) {
       return;
     }
     setCurrentPage(page);
@@ -202,9 +233,7 @@ function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* =========================================
-          HEADER
-      ========================================== */}
+      {/* HEADER */}
       <div>
         <h1 className="text-2xl font-bold text-dark">
           Kelola Mahasiswa
@@ -215,9 +244,7 @@ function StudentsPage() {
         </p>
       </div>
 
-      {/* =========================================
-          ADD BUTTON
-      ========================================== */}
+      {/* ADD BUTTON */}
       <button
         type="button"
         onClick={openCreate}
@@ -227,9 +254,7 @@ function StudentsPage() {
         Tambah Mahasiswa
       </button>
 
-      {/* =========================================
-          TOOLBAR
-      ========================================== */}
+      {/* TOOLBAR */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Per Page */}
         <div className="flex items-center gap-2">
@@ -256,7 +281,7 @@ function StudentsPage() {
           <span className="text-sm text-gray-500">data</span>
         </div>
 
-        {/* Filter + Search */}
+        {/* Filter + Instant Search */}
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {/* Class Filter */}
           <div className="relative">
@@ -281,43 +306,32 @@ function StudentsPage() {
             />
           </div>
 
-          {/* Search */}
-          <form
-            onSubmit={handleSearchSubmit}
-            className="w-full sm:w-auto"
-          >
-            <div className="relative w-full sm:w-72">
-              <Search
-                size={18}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
+          {/* Instant Search Input */}
+          <div className="relative w-full sm:w-72">
+            <Search
+              size={18}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
 
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(event) =>
-                  setSearchInput(event.target.value)
-                }
-                placeholder="Cari mahasiswa..."
-                className="w-full rounded-xl border border-cream-border bg-white py-2.5 pl-10 pr-4 text-sm text-dark outline-none transition placeholder:text-gray-400 focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
-              />
-            </div>
-          </form>
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Cari mahasiswa..."
+              className="w-full rounded-xl border border-cream-border bg-white py-2.5 pl-10 pr-4 text-sm text-dark outline-none transition placeholder:text-gray-400 focus:border-lime-brand focus:ring-2 focus:ring-lime-brand/20"
+            />
+          </div>
         </div>
       </div>
 
-      {/* =========================================
-          ERROR
-      ========================================== */}
+      {/* ERROR */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
           {error}
         </div>
       )}
 
-      {/* =========================================
-          TABLE
-      ========================================== */}
+      {/* TABLE */}
       <div className="overflow-hidden rounded-2xl border border-cream-border bg-white">
         <div className="overflow-x-auto">
           <table className="w-full min-w-212.5">
@@ -348,7 +362,7 @@ function StudentsPage() {
             <tbody>
               {loading ? (
                 <StudentTableLoading />
-              ) : students.length === 0 ? (
+              ) : paginatedStudents.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-5 py-14 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-cream-light text-gray-400">
@@ -365,7 +379,7 @@ function StudentsPage() {
                   </td>
                 </tr>
               ) : (
-                students.map((student) => (
+                paginatedStudents.map((student) => (
                   <StudentRow
                     key={student.id}
                     student={student}
@@ -379,21 +393,17 @@ function StudentsPage() {
         </div>
       </div>
 
-      {/* =========================================
-          PAGINATION
-      ========================================== */}
-      {!loading && students.length > 0 && (
+      {/* PAGINATION */}
+      {!loading && filteredStudents.length > 0 && (
         <Pagination
-          currentPage={pagination.currentPage}
-          lastPage={pagination.lastPage}
-          total={pagination.total}
+          currentPage={currentPage}
+          lastPage={lastPage}
+          total={filteredStudents.length}
           onPageChange={handlePageChange}
         />
       )}
 
-      {/* =========================================
-          CREATE
-      ========================================== */}
+      {/* CREATE */}
       {modal === "create" && (
         <StudentFormModal
           mode="create"
@@ -402,9 +412,7 @@ function StudentsPage() {
         />
       )}
 
-      {/* =========================================
-          EDIT
-      ========================================== */}
+      {/* EDIT */}
       {modal === "edit" && selectedStudent && (
         <StudentFormModal
           mode="edit"
@@ -414,9 +422,7 @@ function StudentsPage() {
         />
       )}
 
-      {/* =========================================
-          DELETE
-      ========================================== */}
+      {/* DELETE */}
       {modal === "delete" && selectedStudent && (
         <DeleteStudentModal
           student={selectedStudent}
@@ -435,7 +441,6 @@ function StudentsPage() {
 function StudentRow({ student, onEdit, onDelete }) {
   return (
     <tr className="border-b border-cream-border transition last:border-b-0 hover:bg-cream-light/40">
-      {/* Nama */}
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-3">
           <StudentAvatar name={student.name} />
@@ -446,22 +451,18 @@ function StudentRow({ student, onEdit, onDelete }) {
         </div>
       </td>
 
-      {/* Username */}
       <td className="px-5 py-3.5">
         <p className="text-sm text-gray-500">{student.username}</p>
       </td>
 
-      {/* Email */}
       <td className="px-5 py-3.5">
         <p className="text-sm text-gray-500">{student.email}</p>
       </td>
 
-      {/* Kelas */}
       <td className="px-5 py-3.5">
         <ClassBadge className={student.class_name} />
       </td>
 
-      {/* Aksi */}
       <td className="px-5 py-3.5">
         <div className="flex items-center justify-center gap-1">
           <ActionButton
@@ -576,7 +577,7 @@ function ActionButton({ icon, label, danger = false, onClick }) {
 }
 
 /* =============================================
-   LOADING
+   LOADING SKELETON
 ============================================= */
 
 function StudentTableLoading() {
@@ -584,7 +585,7 @@ function StudentTableLoading() {
     <tr>
       <td colSpan="5" className="px-5 py-12">
         <div className="space-y-4">
-          {[1, 2, 3].map((item) => (
+          {[1, 2, 3, 4, 5].map((item) => (
             <div
               key={item}
               className="h-10 animate-pulse rounded-lg bg-gray-100"
