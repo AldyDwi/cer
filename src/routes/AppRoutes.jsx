@@ -14,6 +14,7 @@ import GradeRecapPage from "../features/cer/pages/GradeRecapPage";
 import StudentActivitiesPage from "../features/quiz/pages/StudentActivitiesPage";
 import StudentCerAttemptPage from "../features/quiz/pages/StudentCerAttemptPage";
 import StudentCerReviewPage from "../features/quiz/pages/StudentCerReviewPage";
+import ActivityLogPage from "../features/cer/pages/ActivityLogPage";
 
 import { ROLES } from "../constants/roles";
 
@@ -83,6 +84,11 @@ function AppRoutes() {
         <Route
           path="/teacher/cer/:id/review"
           element={<StudentCerReviewPage />}
+        />
+
+        <Route
+          path="/teacher/cer/:id/logs"
+          element={<ActivityLogPage />}
         />
       </Route>
 

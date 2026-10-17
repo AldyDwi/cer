@@ -6,15 +6,12 @@ import {
   ArrowRight,
   BookOpen,
   Check,
-  CheckCircle2,
   Clock3,
   FileText,
   GripVertical,
   LoaderCircle,
   PanelRightOpen,
-  Save,
   Send,
-  ShieldAlert,
   X,
 } from "lucide-react";
 import api from "../../../services/api";
@@ -26,6 +23,7 @@ const AUTOSAVE_INTERVAL = 10_000;
 const SLOTS = [
   {
     key: "claim_card_id",
+    logKey: "claim",
     label: "Claim",
     description: "Pernyataan utama",
     number: "01",
@@ -35,6 +33,7 @@ const SLOTS = [
   },
   {
     key: "evidence_card_id",
+    logKey: "evidence",
     label: "Evidence",
     description: "Data atau fakta pendukung",
     number: "02",
@@ -44,6 +43,7 @@ const SLOTS = [
   },
   {
     key: "reasoning_card_id",
+    logKey: "reasoning",
     label: "Reasoning",
     description: "Hubungan bukti dan klaim",
     number: "03",
@@ -57,6 +57,20 @@ const EMPTY_ANSWER = {
   claim_card_id: null,
   evidence_card_id: null,
   reasoning_card_id: null,
+};
+
+const INITIAL_LOGS = {
+  place_claim: 0,
+  place_evidence: 0,
+  place_reasoning: 0,
+  delete_claim: 0,
+  delete_evidence: 0,
+  delete_reasoning: 0,
+  replace_claim: 0,
+  replace_evidence: 0,
+  replace_reasoning: 0,
+  read_material_count: 0,
+  read_material_time: 0,
 };
 
 function shuffleArray(array) {
@@ -167,21 +181,6 @@ function getFilledCount(answer = EMPTY_ANSWER) {
   return SLOTS.filter((slot) => answer?.[slot.key] != null).length;
 }
 
-function getSaveLabel(status) {
-  switch (status) {
-    case "saving":
-      return "Menyimpan...";
-    case "saved":
-      return "Tersimpan";
-    case "error":
-      return "Gagal menyimpan";
-    case "expired":
-      return "Waktu habis";
-    default:
-      return "Belum tersimpan";
-  }
-}
-
 export default function StudentCerAttemptPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -192,6 +191,8 @@ export default function StudentCerAttemptPage() {
   const [items, setItems] = useState([]);
   const [answers, setAnswers] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0);
+
+  const [logs, setLogs] = useState(INITIAL_LOGS);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -208,6 +209,7 @@ export default function StudentCerAttemptPage() {
   const [activeDropSlot, setActiveDropSlot] = useState(null);
 
   const answersRef = useRef({});
+  const logsRef = useRef(INITIAL_LOGS);
   const dirtyRef = useRef(false);
   const revisionRef = useRef(0);
   const savePromiseRef = useRef(null);
@@ -219,28 +221,57 @@ export default function StudentCerAttemptPage() {
   const currentItem = items[currentIndex] ?? null;
 
   /* =========================================================
+     TRACKING WAKTU BACA MATERI (MODAL MATERI)
+  ========================================================= */
+  useEffect(() => {
+    let timer;
+
+    if (showMaterialModal) {
+      setLogs((prev) => {
+        const nextLogs = {
+          ...prev,
+          read_material_count: prev.read_material_count + 1,
+        };
+        logsRef.current = nextLogs;
+        dirtyRef.current = true;
+        return nextLogs;
+      });
+
+      timer = setInterval(() => {
+        setLogs((prev) => {
+          const nextLogs = {
+            ...prev,
+            read_material_time: prev.read_material_time + 1,
+          };
+          logsRef.current = nextLogs;
+          dirtyRef.current = true;
+          return nextLogs;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showMaterialModal]);
+
+  /* =========================================================
      PENGACAKAN KARTU (SHUFFLE CARDS) PER ITEM
   ========================================================= */
-const shuffledCards = useMemo(() => {
+  const shuffledCards = useMemo(() => {
     if (!currentItem?.cards || currentItem.cards.length === 0) return [];
 
-    // Key unik berdasarkan ID quiz dan ID item
     const storageKey = `cer_cards_order_${quizId}_${currentItem.id}`;
-
-    // 1. Cek apakah urutan acak sudah ada di localStorage
     const savedOrder = localStorage.getItem(storageKey);
 
     if (savedOrder) {
       try {
         const orderIds = JSON.parse(savedOrder);
-        
-        // Petakan kartu sesuai urutan ID yang tersimpan
         const cardMap = new Map(currentItem.cards.map((c) => [Number(c.id), c]));
         const orderedCards = orderIds
           .map((cardId) => cardMap.get(Number(cardId)))
-          .filter(Boolean); // Buang jika ada ID yang tak valid
+          .filter(Boolean);
 
-        // Jika jumlah kartu cocok, gunakan urutan tersimpan
         if (orderedCards.length === currentItem.cards.length) {
           return orderedCards;
         }
@@ -249,10 +280,8 @@ const shuffledCards = useMemo(() => {
       }
     }
 
-    // 2. Jika belum ada di localStorage, acak baru dan simpan
     const newShuffled = shuffleArray(currentItem.cards);
     const newOrderIds = newShuffled.map((card) => card.id);
-    
     localStorage.setItem(storageKey, JSON.stringify(newOrderIds));
 
     return newShuffled;
@@ -347,8 +376,8 @@ const shuffledCards = useMemo(() => {
           null;
 
         const loadedItems = Array.isArray(data.items) ? data.items : [];
-
         const initialAnswers = createInitialAnswers(loadedItems);
+        const loadedLogs = data.logs || INITIAL_LOGS;
 
         setQuiz(
           loadedQuiz
@@ -363,15 +392,15 @@ const shuffledCards = useMemo(() => {
         setFallbackStartedAt(Date.now());
         setItems(loadedItems);
         setAnswers(initialAnswers);
+        setLogs(loadedLogs);
 
         answersRef.current = initialAnswers;
+        logsRef.current = loadedLogs;
         dirtyRef.current = false;
         revisionRef.current = 0;
 
         if (loadedAttempt?.status === "completed") {
-          navigate(`/student/cer/${quizId}/review`, {
-            replace: true,
-          });
+          navigate(`/student/cer/${quizId}/review`, { replace: true });
           return;
         }
 
@@ -423,6 +452,9 @@ const shuffledCards = useMemo(() => {
     return () => window.clearInterval(intervalId);
   }, [deadlineInfo.timestamp]);
 
+  /* =========================================================
+     AUTOSAVE DENGAN PAYLOAD ANSWERS + LOGS
+  ========================================================= */
   const saveNow = useCallback(async () => {
     if (!enabledRef.current || !dirtyRef.current) {
       return true;
@@ -446,6 +478,7 @@ const shuffledCards = useMemo(() => {
 
     const payload = {
       answers: toAnswerPayload(answersRef.current),
+      logs: logsRef.current,
     };
 
     setSaveStatus("saving");
@@ -465,6 +498,7 @@ const shuffledCards = useMemo(() => {
           enabledRef.current = false;
           setSaveStatus("expired");
           setErrorMessage("Waktu habis atau attempt sudah selesai.");
+          navigate(`/student/cer/${quizId}/review`, { replace: true });
         } else {
           setSaveStatus("error");
           setErrorMessage(
@@ -492,7 +526,7 @@ const shuffledCards = useMemo(() => {
     }
 
     return !dirtyRef.current;
-  }, [quizId]);
+  }, [quizId, navigate]);
 
   useEffect(() => {
     if (!attempt || attempt.status !== "in_progress") {
@@ -526,12 +560,40 @@ const shuffledCards = useMemo(() => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [saveNow]);
 
+  /* =========================================================
+     ASSIGN CARD DENGAN TRACKING LOG (PLACE / DELETE / REPLACE)
+  ========================================================= */
   const assignCard = useCallback((itemId, field, cardId) => {
     if (!enabledRef.current || submittingRef.current) {
       return;
     }
 
     setAnswers((previous) => {
+      const currentSlotAnswer = previous[itemId]?.[field] ?? null;
+      const targetSlot = SLOTS.find((s) => s.key === field);
+      const slotLogKey = targetSlot?.logKey || "claim";
+
+      let actionType = null;
+      if (cardId === null && currentSlotAnswer !== null) {
+        actionType = "delete";
+      } else if (cardId !== null && currentSlotAnswer === null) {
+        actionType = "place";
+      } else if (cardId !== null && currentSlotAnswer !== null && cardId !== currentSlotAnswer) {
+        actionType = "replace";
+      }
+
+      if (actionType) {
+        const logFieldKey = `${actionType}_${slotLogKey}`;
+        setLogs((prevLogs) => {
+          const nextLogs = {
+            ...prevLogs,
+            [logFieldKey]: (prevLogs[logFieldKey] || 0) + 1,
+          };
+          logsRef.current = nextLogs;
+          return nextLogs;
+        });
+      }
+
       const nextAnswer = {
         ...EMPTY_ANSWER,
         ...(previous[itemId] ?? {}),
@@ -638,6 +700,9 @@ const shuffledCards = useMemo(() => {
     setErrorMessage("");
   };
 
+  /* =========================================================
+     FINAL SUBMIT DENGAN PAYLOAD ANSWERS + LOGS
+  ========================================================= */
   const handleSubmit = async (automatic = false) => {
     if (submittingRef.current) return;
 
@@ -661,13 +726,17 @@ const shuffledCards = useMemo(() => {
 
       const payload = {
         answers: toAnswerPayload(answersRef.current),
+        logs: logsRef.current,
       };
 
-      await api.post(
+      console.log("Payload Submit Diteruskan:", payload); // Cek via Console Browser
+
+      const response = await api.post(
         `/student/cer-quizzes/${quizId}/attempt/submit`,
         payload
       );
 
+      // Hapus penyimpanan temporary urutan kartu
       Object.keys(localStorage).forEach((key) => {
         if (key.startsWith(`cer_cards_order_${quizId}_`)) {
           localStorage.removeItem(key);
@@ -677,24 +746,16 @@ const shuffledCards = useMemo(() => {
       dirtyRef.current = false;
       setSaveStatus("saved");
 
-      if (automatic) {
-        navigate(`/student/cer/${id}/review`, { replace: true });
-        return;
+      // Navigasi eksplisit setelah API membalas 200 OK
+      if (response.status === 200) {
+        navigate(`/student/cer/${quizId}/review`, { replace: true });
       }
-
-      navigate(`/student/cer/${id}/review`, {
-        replace: true,
-      });
-
     } catch (error) {
       const status = error.response?.status;
 
       if (status === 409) {
-        setSaveStatus("expired");
-        setErrorMessage(
-          error.response?.data?.message ??
-            "Waktu habis. Periksa status attempt sebelum mencoba kembali."
-        );
+        // Jika sudah completed, langsung lemparkan ke halaman review
+        navigate(`/student/cer/${quizId}/review`, { replace: true });
       } else {
         enabledRef.current = true;
         setErrorMessage(
@@ -722,9 +783,6 @@ const shuffledCards = useMemo(() => {
     handleSubmit(true);
   }, [remainingSeconds, attempt?.status]);
 
-  /* =========================================================
-     LOADING SKELETON UI BARU
-  ========================================================= */
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-cream-light p-6">
@@ -826,7 +884,6 @@ const shuffledCards = useMemo(() => {
       `}</style>
 
       <main className="min-h-screen bg-cream-light pb-12 text-slate-900">
-        {/* Header aktivitas - Progress Bar Diperbaiki di Dalam Header Sticky */}
         <header className="sticky top-[-10.5px] z-20 border-b border-cream-border bg-cream-light/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="min-w-0">
@@ -843,7 +900,6 @@ const shuffledCards = useMemo(() => {
               </h1>
             </div>
 
-            {/* Timer dan deadline */}
             <div
               className={`shrink-0 rounded-xl border px-3 py-1.5 text-right ${
                 isLowTime
@@ -868,7 +924,6 @@ const shuffledCards = useMemo(() => {
             </div>
           </div>
 
-          {/* Garis hijau pengerjaan dipastikan berada di dalam header sticky */}
           <div className="h-1 bg-cream-border">
             <div
               className="h-full bg-lime-brand transition-[width] duration-500"
@@ -881,10 +936,8 @@ const shuffledCards = useMemo(() => {
           </div>
         </header>
 
-        {/* Workspace utama */}
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
           <section className="flex flex-col gap-6">
-            {/* Judul dan tombol ringkasan */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[.18em] text-slate-500">
@@ -919,7 +972,6 @@ const shuffledCards = useMemo(() => {
               </div>
             </div>
 
-            {/* Slot CER horizontal */}
             <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
@@ -1027,7 +1079,6 @@ const shuffledCards = useMemo(() => {
               </div>
             </div>
 
-            {/* Pilihan kartu: Kartu yang ditampilkan diacak posisinya */}
             <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
@@ -1040,7 +1091,6 @@ const shuffledCards = useMemo(() => {
                 </div>
               </div>
 
-              {/* Grid 5 Kolom Horizontal */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
                 {shuffledCards.map((card, index) => {
                   const selectedSlot = SLOTS.find(
@@ -1113,7 +1163,6 @@ const shuffledCards = useMemo(() => {
               </div>
             </div>
 
-            {/* Navigasi antar-triplet */}
             <div className="flex items-center justify-between gap-3 pt-2">
               <button
                 type="button"
@@ -1160,7 +1209,6 @@ const shuffledCards = useMemo(() => {
         </div>
       </main>
 
-      {/* Overlay sidebar ringkasan */}
       {isSidebarOpen && (
         <button
           type="button"
@@ -1170,7 +1218,6 @@ const shuffledCards = useMemo(() => {
         />
       )}
 
-      {/* Sidebar kanan */}
       <aside
         id="student-cer-summary-sidebar"
         aria-label="Ringkasan aktivitas"
@@ -1201,7 +1248,6 @@ const shuffledCards = useMemo(() => {
           </button>
         </div>
 
-        {/* Progres */}
         <div className="rounded-2xl border border-cream-border bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-extrabold">Progres</h3>
@@ -1280,7 +1326,6 @@ const shuffledCards = useMemo(() => {
         </button>
       </aside>
 
-      {/* Modal materi */}
       {showMaterialModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
@@ -1345,7 +1390,6 @@ const shuffledCards = useMemo(() => {
         </div>
       )}
 
-      {/* Modal konfirmasi submit */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
           <section
@@ -1400,7 +1444,6 @@ const shuffledCards = useMemo(() => {
         </div>
       )}
 
-      {/* Indikator submit otomatis ketika waktu habis */}
       {isDeadlineReached && submitting && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
           <div className="flex w-full max-w-sm items-center gap-3 rounded-2xl bg-white p-5 shadow-xl">

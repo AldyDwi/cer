@@ -10,6 +10,7 @@ import {
   GripVertical,
   ArrowLeft,
   ArrowRight,
+  Activity,
 } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -213,7 +214,7 @@ function ManageCerPage() {
           </h1>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
           {/* LEFT */}
           <div className="space-y-4">
             <InfoRow
@@ -240,7 +241,8 @@ function ManageCerPage() {
           </div>
 
           {/* RIGHT */}
-          <div className="flex flex-col items-start gap-3 lg:items-end">
+          <div className="flex w-full flex-col items-start gap-3 lg:items-end">
+            {/* Status */}
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-500">
                 Status
@@ -259,11 +261,11 @@ function ManageCerPage() {
               </button>
             </div>
 
-            <div className="flex flex-row items-center gap-2">
+            <div className="grid w-full grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => navigate(`/teacher/cer/${activity.id}/grades`)}
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-white px-3 py-2 text-xs font-semibold text-dark transition hover:bg-cream-light sm:px-4 sm:py-2.5 sm:text-sm"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-white px-3 py-2 text-xs font-semibold text-dark transition hover:bg-cream-light sm:px-4 sm:py-2.5 sm:text-sm"
               >
                 <ClipboardList size={16} className="shrink-0" />
                 <span className="whitespace-nowrap">Rekap Nilai</span>
@@ -272,12 +274,21 @@ function ManageCerPage() {
               <button
                 type="button"
                 onClick={() => setShowPreviewModal(true)}
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-[#F5FCE9] px-3 py-2 injection-btn text-xs font-semibold text-dark transition hover:bg-[#EAF8D3] sm:px-4 sm:py-2.5 sm:text-sm"
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-[#F5FCE9] px-3 py-2 text-xs font-semibold text-dark transition hover:bg-[#EAF8D3] sm:px-4 sm:py-2.5 sm:text-sm"
               >
                 <Eye size={16} className="shrink-0 text-[#5C8C00]" />
                 <span className="whitespace-nowrap">Preview</span>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={() => navigate(`/teacher/cer/${activity.id}/logs`)}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-cream-border bg-white px-3 py-2 text-xs font-semibold text-dark transition hover:bg-cream-light sm:px-4 sm:py-2.5 sm:text-sm"
+            >
+              <Activity size={16} className="shrink-0 text-violet-600" />
+              <span className="whitespace-nowrap">Log Aktivitas Mahasiswa</span>
+            </button>
           </div>
         </div>
       </section>
