@@ -24,12 +24,12 @@ window.Pusher = Pusher;
 const echo = new Echo({
   broadcaster: "reverb",
   key: import.meta.env.VITE_REVERB_APP_KEY ?? "reverbkey123",
-  wsHost: import.meta.env.VITE_REVERB_HOST ?? "localhost",
-  wsPort: import.meta.env.VITE_REVERB_PORT ?? 8080,
-  wssPort: import.meta.env.VITE_REVERB_PORT ?? 443,
+  wsHost: import.meta.env.VITE_REVERB_HOST ?? "definite-incredibly-tadpole.ngrok-free.app",
+  wsPort: Number(import.meta.env.VITE_REVERB_PORT ?? 8080),
+  wssPort: Number(import.meta.env.VITE_REVERB_PORT ?? 443),
   forceTLS: (import.meta.env.VITE_REVERB_SCHEME ?? "https") === "https",
   enabledTransports: ["ws", "wss"],
-  
+
   authEndpoint: `${import.meta.env.VITE_API_URL}/broadcasting/auth`,
   authorizer: (channel, options) => {
     return {
@@ -40,6 +40,7 @@ const echo = new Echo({
             "Content-Type": "application/json",
             "Accept": "application/json",
             "X-Requested-With": "XMLHttpRequest",
+            "ngrok-skip-browser-warning": "69420",
           },
           credentials: "include",
           body: JSON.stringify({
