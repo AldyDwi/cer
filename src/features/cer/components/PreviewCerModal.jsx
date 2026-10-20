@@ -204,7 +204,6 @@ export default function PreviewCerModal({ activity, triplets = [], onClose }) {
 
                         {correctCard ? (
                           <div className="flex flex-1 items-start gap-2.5 rounded-xl border border-white/80 bg-white p-3 shadow-sm">
-                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                             <p className="flex-1 whitespace-pre-line text-xs leading-5 text-slate-700">
                               {correctCard.content}
                             </p>
@@ -231,10 +230,6 @@ export default function PreviewCerModal({ activity, triplets = [], onClose }) {
                       Tarik kartu ke slot CER atau klik kartu untuk memilihnya.
                     </p>
                   </div>
-
-                  <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                    {shuffledCardsList.length} kartu
-                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
