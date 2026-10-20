@@ -9,7 +9,6 @@ export async function getCsrfCookie() {
     headers: {
       "Accept": "application/json",
       "X-Requested-With": "XMLHttpRequest",
-      "ngrok-skip-browser-warning": "69420",
     },
   });
 }
