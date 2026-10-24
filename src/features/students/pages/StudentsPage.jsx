@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronDown,
   Users,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -21,6 +22,7 @@ import {
 
 import StudentFormModal from "../components/StudentFormModal";
 import DeleteStudentModal from "../components/DeleteStudentModal";
+import ImportUserModal from "../components/ImportUserModal";
 import echo from "../../../utils/echo";
 
 function StudentsPage() {
@@ -37,7 +39,7 @@ function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   /* =========================================================
-     REACT QUERY DATA FETCHING (Mengambil data tanpa parameter search/page)
+     REACT QUERY DATA FETCHING
   ========================================================= */
 
   const {
@@ -47,8 +49,8 @@ function StudentsPage() {
     error: queryError,
   } = useQuery({
     queryKey: ["students"],
-    queryFn: () => getStudents({ perPage: 1000 }), // Ambil seluruh/sebagian besar data untuk diolah di client-side
-    staleTime: 1000 * 60 * 5, // Cache data selama 5 menit
+    queryFn: () => getStudents({ perPage: 1000 }),
+    staleTime: 1000 * 60 * 5,
   });
 
   /* =========================================================
@@ -113,12 +115,10 @@ function StudentsPage() {
     return filteredStudents.slice(start, start + perPage);
   }, [filteredStudents, currentPage, perPage]);
 
-  // Reset halaman ke-1 saat kata kunci search, filter kelas, atau perPage berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [search, className, perPage]);
 
-  // Menjaga agar currentPage tidak melebihi lastPage
   useEffect(() => {
     if (currentPage > lastPage) {
       setCurrentPage(lastPage);
@@ -201,6 +201,10 @@ function StudentsPage() {
     setModal("create");
   }
 
+  function openImport() {
+    setModal("import");
+  }
+
   function openEdit(student) {
     setSelectedStudent(student);
     setModal("edit");
@@ -231,6 +235,10 @@ function StudentsPage() {
     return deleteMutation.mutateAsync(selectedStudent.id);
   }
 
+  function handleImportSuccess() {
+    queryClient.invalidateQueries({ queryKey: ["students"] });
+  }
+
   return (
     <div className="space-y-6">
       {/* HEADER */}
@@ -244,15 +252,26 @@ function StudentsPage() {
         </p>
       </div>
 
-      {/* ADD BUTTON */}
-      <button
-        type="button"
-        onClick={openCreate}
-        className="flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90"
-      >
-        <Plus size={18} />
-        Tambah Mahasiswa
-      </button>
+      {/* ACTION BUTTONS (TAMBAH & IMPORT) */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={openCreate}
+          className="flex items-center gap-2 rounded-xl bg-dark px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90"
+        >
+          <Plus size={18} />
+          Tambah Mahasiswa
+        </button>
+
+        <button
+          type="button"
+          onClick={openImport}
+          className="flex items-center gap-2 rounded-xl border bg-dark px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90"
+        >
+          <FileSpreadsheet size={18} className="text-lime-brand" />
+          Import Data
+        </button>
+      </div>
 
       {/* TOOLBAR */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -409,6 +428,14 @@ function StudentsPage() {
           mode="create"
           onClose={closeModal}
           onSubmit={handleCreate}
+        />
+      )}
+
+      {/* IMPORT */}
+      {modal === "import" && (
+        <ImportUserModal
+          onClose={closeModal}
+          onSuccess={handleImportSuccess}
         />
       )}
 
