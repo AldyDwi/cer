@@ -9,6 +9,7 @@ import {
   ChevronDown,
   Users,
   FileSpreadsheet,
+  Download,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "react-toastify";
@@ -23,6 +24,7 @@ import {
 import StudentFormModal from "../components/StudentFormModal";
 import DeleteStudentModal from "../components/DeleteStudentModal";
 import ImportUserModal from "../components/ImportUserModal";
+import { downloadUserTemplate } from "../services/downloadTemplate";
 import echo from "../../../utils/echo";
 
 function StudentsPage() {
@@ -252,7 +254,7 @@ function StudentsPage() {
         </p>
       </div>
 
-      {/* ACTION BUTTONS (TAMBAH & IMPORT) */}
+      {/* ACTION BUTTONS (TAMBAH, IMPORT, & DOWNLOAD TEMPLATE) */}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -271,6 +273,23 @@ function StudentsPage() {
           <FileSpreadsheet size={18} className="text-lime-brand" />
           Import Data
         </button>
+
+        <div className="group relative inline-block">
+          <button
+            type="button"
+            onClick={downloadUserTemplate}
+            className="flex items-center gap-2 rounded-xl border bg-dark px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-dark/90"
+          >
+            <Download size={18} className="text-sky-400" />
+            Download Template
+          </button>
+
+          {/* TOOLTIP MELAYANG SISI ATAS */}
+          <div className="pointer-events-none absolute -top-10 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap rounded-lg bg-dark px-3 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-all duration-200 group-hover:opacity-100">
+            Unduh template Excel untuk import data
+            <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-dark" />
+          </div>
+        </div>
       </div>
 
       {/* TOOLBAR */}
