@@ -16,26 +16,18 @@ export async function downloadUserTemplate() {
 
   // Tambahkan data dummy
   worksheet.addRow({
-    username: "ahmad",
-    email: "ahmad@mail.com",
+    username: "siswa",
+    email: "siswa@gmail.com",
     password: "siswa123",
-    nama_lengkap: "Ahmad Fajar",
+    nama_lengkap: "Siswa Percobaan",
     kelas: "TI-3A",
     role: "student",
   });
   worksheet.addRow({
-    username: "citra",
-    email: "citrai@mail.com",
-    password: "siswa123",
-    nama_lengkap: "Citra Lestari",
-    kelas: "TI-3B",
-    role: "student",
-  });
-  worksheet.addRow({
-    username: "hendra",
-    email: "hendra@mail.com",
+    username: "guru",
+    email: "guru@gmail.com",
     password: "guru1234",
-    nama_lengkap: "Dr. Hendra Wijaya",
+    nama_lengkap: "Guru Demo",
     kelas: "",
     role: "teacher",
   });
