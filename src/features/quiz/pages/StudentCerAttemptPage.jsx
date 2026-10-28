@@ -221,6 +221,38 @@ export default function StudentCerAttemptPage() {
   const currentItem = items[currentIndex] ?? null;
 
   /* =========================================================
+     AUTO SCROLL LAKUKAN DRAG DI KURSOR ATAS / BAWAH
+  ========================================================= */
+  useEffect(() => {
+    if (!draggingCardId) return;
+
+    let animFrameId;
+
+    const handleDragOverWindow = (e) => {
+      const threshold = 120; // Jarak zona scroll (px) dari tepi atas/bawah
+      const clientY = e.clientY;
+      const windowHeight = window.innerHeight;
+
+      if (clientY < threshold) {
+        // Drag mendekati bagian atas layar -> scroll up
+        const speed = Math.max(5, Math.floor((threshold - clientY) / 3));
+        window.scrollBy({ top: -speed, behavior: "instant" });
+      } else if (windowHeight - clientY < threshold) {
+        // Drag mendekati bagian bawah layar -> scroll down
+        const speed = Math.max(5, Math.floor((threshold - (windowHeight - clientY)) / 3));
+        window.scrollBy({ top: speed, behavior: "instant" });
+      }
+    };
+
+    window.addEventListener("dragover", handleDragOverWindow);
+
+    return () => {
+      window.removeEventListener("dragover", handleDragOverWindow);
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+    };
+  }, [draggingCardId]);
+
+  /* =========================================================
      TRACKING WAKTU BACA MATERI (MODAL MATERI)
   ========================================================= */
   useEffect(() => {
@@ -729,7 +761,7 @@ export default function StudentCerAttemptPage() {
         logs: logsRef.current,
       };
 
-      console.log("Payload Submit Diteruskan:", payload); // Cek via Console Browser
+      console.log("Payload Submit Diteruskan:", payload);
 
       const response = await api.post(
         `/student/cer-quizzes/${quizId}/attempt/submit`,
@@ -746,7 +778,6 @@ export default function StudentCerAttemptPage() {
       dirtyRef.current = false;
       setSaveStatus("saved");
 
-      // Navigasi eksplisit setelah API membalas 200 OK
       if (response.status === 200) {
         navigate(`/student/cer/${quizId}/review`, { replace: true });
       }
@@ -754,7 +785,6 @@ export default function StudentCerAttemptPage() {
       const status = error.response?.status;
 
       if (status === 409) {
-        // Jika sudah completed, langsung lemparkan ke halaman review
         navigate(`/student/cer/${quizId}/review`, { replace: true });
       } else {
         enabledRef.current = true;
@@ -843,6 +873,10 @@ export default function StudentCerAttemptPage() {
   return (
     <>
       <style>{`
+        nav, header:not(.cer-header) {
+          display: none !important;
+        }
+
         @keyframes cer-card-enter {
           from {
             opacity: 0;
@@ -884,17 +918,9 @@ export default function StudentCerAttemptPage() {
       `}</style>
 
       <main className="min-h-screen bg-cream-light pb-12 text-slate-900">
-        <header className="sticky top-[-10.5px] z-20 border-b border-cream-border bg-cream-light/95 backdrop-blur">
+        <header className="cer-header sticky top-0 z-20 border-b border-cream-border bg-white backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="min-w-0">
-              <button
-                onClick={() => navigate("/student")}
-                className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-900"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Daftar aktivitas
-              </button>
-
               <h1 className="truncate text-base font-extrabold sm:text-lg">
                 {quiz.title}
               </h1>
@@ -904,7 +930,7 @@ export default function StudentCerAttemptPage() {
               className={`shrink-0 rounded-xl border px-3 py-1.5 text-right ${
                 isLowTime
                   ? "border-red-200 bg-red-50 text-red-700"
-                  : "border-cream-border bg-white text-slate-800"
+                  : "border-gray-400 bg-white text-slate-800"
               }`}
             >
               <div className="flex items-center justify-end gap-2">
