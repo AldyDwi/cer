@@ -315,7 +315,7 @@ export default function StudentActivitiesPage() {
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-gray-500">
               {search
                 ? "Coba gunakan kata kunci lain."
-                : "Aktivitas akan muncul di sini setelah dosen memublikasikannya."}
+                : "Aktivitas akan muncul di sini setelah dosen mempublikasikannya."}
             </p>
           </div>
         )}
